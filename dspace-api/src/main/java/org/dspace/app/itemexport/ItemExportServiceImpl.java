@@ -1246,6 +1246,36 @@ public class ItemExportServiceImpl implements ItemExportService
 
     // Returns String representing author String for file name formatting
     private void exportForPortico(Item item){
+
+        // String for formatting file name
+        String formatString = "";
+        // ArrayList for looping through bundkes
+        List <Bundle> bundles = item.getBundles();
+        // Check item contains bundles
+        if (bundles != null)
+        {
+            System.out.println("Bundles loaded");
+        }
+        // Loop through bundles, get bitstreams to extract file name
+        for(Bundle bundle : bundles){
+            int i = 0;
+            List <Bitstream> bitstreams = bundle.getBitstreams();
+            // loop through bitstreams and extract file name
+            for (Bitstream bitstream : bitstreams) {
+                String rawBitstreamString = bitstream.getName();
+                // remove file type from file name String
+                int split = rawBitstreamString.indexOf(".");
+                String removeFileType = rawBitstreamString.substring(0, split);
+                // Only needed for test
+                formatString += removeFileType.replace(" ", "_");
+                i++;
+            }
+            // Only check first bitstream, exit loop
+            if(i >= 1){
+                break;
+            }
+        }
+
         // create list containing author metadata
         List <MetadataValue> authMetaList = item.getAuthors();
         // system confirmation
@@ -1253,7 +1283,7 @@ public class ItemExportServiceImpl implements ItemExportService
         {
             System.out.println("Author list loaded");
         }
-        // 
+        // If record contains multiple authors
         if (authMetaList.size() > 1) 
         {
             // ArrayList for sorting author names
@@ -1261,6 +1291,7 @@ public class ItemExportServiceImpl implements ItemExportService
             // add author names to ArrayList
             for (MetadataValue author : authMetaList) 
             {
+                // format String
                 String authFullName = author.getValue();
                 int split = authFullName.indexOf(",");
                 String authSurname = authFullName.substring(0, split);
@@ -1270,18 +1301,18 @@ public class ItemExportServiceImpl implements ItemExportService
             Collections.sort(authList);
             // format String
             String authSurname = authList.get(0);
-            //String tmp2 = tmp.replace(",", "");
-            porticoFileName = authSurname + "_et_al_EITN_Remote_Consultation_Between_VOR";
+            porticoFileName = authSurname + "_et_al_" + formatString + "_vor";
         }
+        // If author list contains single authr
         else 
         {
             // format String
             String authFullName = item.getAuthor();
             int split = authFullName.indexOf(",");
             String authSurname = authFullName.substring(0, split);
-            //String tmp2 = tmp.replace(",", "");
-            porticoFileName = authSurname + "_EITN_Remote_Consultation_Between_VOR";
+            porticoFileName = authSurname + formatString + "_vor";
         }
+
     }
 
 }
