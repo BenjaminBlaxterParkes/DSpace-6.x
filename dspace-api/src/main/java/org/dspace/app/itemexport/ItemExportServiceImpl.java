@@ -74,6 +74,7 @@ public class ItemExportServiceImpl implements ItemExportService
     private Logger log = Logger.getLogger(ItemExportServiceImpl.class);
 
     private String porticoFileName;
+    private String porticoEperson;
     private boolean porticoFile =  false;
 
     protected ItemExportServiceImpl()
@@ -538,10 +539,14 @@ public class ItemExportServiceImpl implements ItemExportService
             Context context, boolean migrate, String flag) throws Exception
     {
 
+        // set portico flag
         if (flag != null){
             porticoFile = true;
         }
         EPerson eperson = context.getCurrentUser();
+        // Store portico ePerson ID
+        porticoEperson = eperson.getID().toString();
+        
         ArrayList<DSpaceObject> list = new ArrayList<DSpaceObject>(1);
         list.add(dso);
         processDownloadableExport(list, context, eperson == null ? null : eperson.getEmail(), migrate);
@@ -757,9 +762,9 @@ public class ItemExportServiceImpl implements ItemExportService
                             exportItem(context, iitems, workDir, 1, migrate, false);
                         }
 
-                        System.out.println("Parent Directory: " + workParentDir);
-                        System.out.println("Download Directory: " + downloadDir);
-                        System.out.println("File Name: " + fileName);
+                        //System.out.println("Parent Directory: " + workParentDir);
+                        //System.out.println("Download Directory: " + downloadDir);
+                        //System.out.println("File Name: " + fileName);
 
                         // now zip up the export directory created above
                         zip(workParentDir, downloadDir
@@ -891,8 +896,9 @@ public class ItemExportServiceImpl implements ItemExportService
     @Override
     public long getExportFileSize(Context context, String fileName) throws Exception
     {
-        String strID = fileName.substring(fileName.lastIndexOf('_') + 1,
-                fileName.lastIndexOf('.'));
+
+        String strID = downloadForPortico(context, fileName);
+
         EPerson ePerson = getEPersonFromString(context, strID);
 
 
@@ -932,8 +938,8 @@ public class ItemExportServiceImpl implements ItemExportService
     public long getExportFileLastModified(Context context, String fileName)
             throws Exception
     {
-        String strID = fileName.substring(fileName.lastIndexOf('_') + 1,
-                fileName.lastIndexOf('.'));
+        String strID = downloadForPortico(context, fileName);
+
         EPerson ePerson = getEPersonFromString(context, strID);
 
         File file = new File(
@@ -953,19 +959,26 @@ public class ItemExportServiceImpl implements ItemExportService
     @Override
     public boolean canDownload(Context context, String fileName)
     {
+
+        System.out.println("canDownload() Triggered");
         EPerson eperson = context.getCurrentUser();
+
         if (eperson == null)
         {
+            //System.out.println("Eperson null");
             return false;
         }
-        String strID = fileName.substring(fileName.lastIndexOf('_') + 1,
-                fileName.lastIndexOf('.'));
+
+        String strID = downloadForPortico(context, fileName);
+
         try
         {
+
             if (strID.equals(eperson.getID().toString()))
             {
                 return true;
             }
+
         }
         catch (Exception e)
         {
@@ -1309,10 +1322,28 @@ public class ItemExportServiceImpl implements ItemExportService
             // format String
             String authFullName = item.getAuthor();
             int split = authFullName.indexOf(",");
-            String authSurname = authFullName.substring(0, split);
+            String authSurname = authFullName.substring(0, split) + "_";
             porticoFileName = authSurname + formatString + "_vor";
         }
 
+    }
+
+    // Checks and returns the correct ePerson ID string based on what type of download it is
+    public String downloadForPortico(Context context, String fileName){
+
+        String strID; 
+
+        if(porticoEperson.equals(context.getCurrentUser().getID().toString()))
+        {
+            strID = porticoEperson;
+        }
+        else 
+        {
+            strID = fileName.substring(fileName.lastIndexOf('_') + 1,
+                fileName.lastIndexOf('.'));
+        }
+
+        return strID;
     }
 
 }

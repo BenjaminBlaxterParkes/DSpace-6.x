@@ -95,8 +95,6 @@ public class ItemExportDownloadReader extends AbstractReader implements Recyclab
 
             // Get our parameters that identify the bitstream
             String fileName = par.getParameter("fileName", null);
-            
-                
             // Is there a User logged in and does the user have access to read it?
             if (!itemExportService.canDownload(context, fileName))
             {
