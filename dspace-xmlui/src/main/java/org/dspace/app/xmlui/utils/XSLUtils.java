@@ -110,7 +110,8 @@ public class XSLUtils {
         }
         finally {
             // If there's a problem in the database we need to free the connection
-            if(context != null) {
+            if(context != null) 
+            {
                 context.abort();    
             }
         }
