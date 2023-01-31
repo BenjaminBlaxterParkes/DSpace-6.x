@@ -214,7 +214,7 @@
                                                     </a>
                                                     <a href="{$root-url}discover?filtertype=author&amp;filter_relational_operator=equals&amp;filter=Education%2C+The+Moray+House+School+of"
                                                         class="list-group-item ds-option" alt="click to view all papers for this school" title="Click to view all papers from this school">
-                                                        Education, The Moray House School of
+                                                        Education and Sport, The Moray House School of
                                                     </a>
                                                     <a href="{$root-url}discover?filtertype=author&amp;filter_relational_operator=equals&amp;filter=Engineering%2C+School+of"
                                                         class="list-group-item ds-option" alt="click to view all papers for this school" title="Click to view all papers from this school">
