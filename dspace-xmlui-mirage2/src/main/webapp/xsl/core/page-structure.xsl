@@ -286,6 +286,9 @@
                     <xsl:when test="starts-with($request-uri, 'page/accessibility')">
                         Accessibility Statement
                     </xsl:when>
+                    <xsl:when test="starts-with($request-uri, 'register')">
+                        Register
+                    </xsl:when>
                     <xsl:when test="not($page_title)">
                         <xsl:text>  </xsl:text>
                     </xsl:when>
@@ -776,17 +779,17 @@
                     <div class="col-md-3 footer-block">
                         <h3>Open Access</h3>
 
-                        <p>To find out how you can benefit from open access to research, see our <a href="//www.st-andrews.ac.uk/library/services/researchsupport/openaccess/" title="University of St Andrews Library Open Access web pages" target="_blank">library web pages</a> and <a href="//univstandrews-oaresearch.blogspot.co.uk/" title="Open Access Blog" target="_blank">Open Access blog</a>. For open access help contact: <a href="mailto:openaccess@st-andrews.ac.uk">openaccess@st-andrews.ac.uk</a>.</p>
+                        <p>To find out how you can benefit from open access to research, see our <a href="https://www.st-andrews.ac.uk/research/support/open-research/open-access/" title="University of St Andrews Library Open Access web pages" target="_blank">library web pages</a> and <a href="//univstandrews-oaresearch.blogspot.co.uk/" title="Open Access Blog" target="_blank">Open Access blog</a>. For open access help contact: <a href="mailto:openaccess@st-andrews.ac.uk">openaccess@st-andrews.ac.uk</a>.</p>
                         <h3>Accessibility</h3>
                         <p>Read our <a href="/page/accessibility" title="Accessibility statement">Accessibility statement</a>.</p>
                         </div>
                     <div class="col-md-3 footer-block">
                         <h3>How to submit research papers</h3>
-                        <p>The full text of research papers can be submitted to the repository via <a href="//www.st-andrews.ac.uk/staff/research/pure/" title="Pure" target="_blank">Pure</a>, the University's research information system. For help see our guide: <a href="http://www.st-andrews.ac.uk/library/services/researchsupport/openaccess/deposit/" title="How to deposit in Pure" target="_blank">How to deposit in Pure</a>.</p>
+                        <p>The full text of research papers can be submitted to the repository via <a href="https://www.st-andrews.ac.uk/research/support/pure/" title="Pure" target="_blank">Pure</a>, the University's research information system. For help see our guide: <a href="https://www.st-andrews.ac.uk/research/support/open-research/open-access/how-to-deposit/" title="How to deposit in Pure" target="_blank">How to deposit in Pure</a>.</p>
                     </div>
                     <div class="col-md-3 footer-block">
                         <h3>Electronic thesis deposit</h3>
-                        <p>Help with <a href="https://libguides.st-andrews.ac.uk/c.php?g=669998&amp;p=4756152" target="_blank" title="Help with electronic theses deposit">deposit</a>.</p>
+                        <p>Help with <a href="https://libguides.st-andrews.ac.uk/c.php?g=669998p=5027192" target="_blank" title="Help with electronic theses deposit">deposit</a>.</p>
                         <h3>Repository help</h3>
                         <p>For repository help contact: <a href="mailto:Digital-Repository@st-andrews.ac.uk" title="Email address for St Andrews Research Repository">Digital-Repository@st-andrews.ac.uk</a>.</p>
                         <p><a href="/feedback" title="For sharing feedback about the St Andrews Research Repository">Give Feedback</a></p>
@@ -1062,6 +1065,46 @@
 
                         <h2>Change Log</h2>
                         <p>Since our first evaluation and statement which was based on automated testing we have been doing extensive manual testing including with a range of assistive technology to ensure we have a clear picture of the accessibility issues and how best to resolve them.</p>
+                    </div>
+                </xsl:when>
+                <xsl:when test="starts-with($request-uri, 'register')">
+                    <div class="hero-unit">
+                        <form id="aspect_eperson_LoginChooser_div_login" class="ds-interactive-div primary" action="/ldap-login" method="post" onsubmit="javascript:tSubmit(this);" data-gtm-form-interact-id="0">
+                            <h1 class="ds-div-head">New User Registrations</h1>
+                            <div id="aspect_eperson_LoginChooser_div_register_header" class="ds-static-div">
+                                <p class="ds-paragraph">
+                                <strong>To register</strong> with the St Andrews Research Repository to submit an electronic thesis please enter your standard St Andrews Username and Password in the boxes above, give any preferred current contact email address and details of your school and department in the fields below.</p>
+                                <p class="ds-paragraph">
+                                <strong>Please click on the white Register button</strong> at the very bottom which will send your registration details to the Repository Administrator. We will complete your registration and send confirmation to you as soon as we can. We will send the confirmation to your St Andrews email address unless you indicate a preferred contact email.</p>
+                                <p class="ds-paragraph">Please note that you will not be able to make a submission until you receive this confirmation, so please log out of the St Andrews Research Repository after you have completed this initial registration.</p>
+                                <p class="ds-paragraph">
+                                <strong>Once you have received acknowledgement</strong> of your registration you can login again using your St Andrews Username and Password to make your submission.</p>
+                            </div>
+                            <fieldset id="aspect_eperson_LoginChooser_list_registration" class="col ds-form-list">
+                                <div class="ds-form-item row">
+                                    <div class="control-group col-sm-12">
+                                        <label class="control-label" for="aspect_eperson_LoginChooser_field_customemail">Preferred contact email(Optional): </label>
+                                        <input id="aspect_eperson_LoginChooser_field_customemail" class="ds-text-field form-control" name="customemail" type="text" value="" autofocus="autofocus"></input>
+                                        <div data-lastpass-icon-root="true" style="position: relative !important; height: 0px !important; width: 0px !important; float: left !important;">
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="ds-form-item row">
+                                    <div class="control-group col-sm-12">
+                                        <label class="control-label" for="aspect_eperson_LoginChooser_field_school">School and/or Department(Mandatory) </label>
+                                        <input id="aspect_eperson_LoginChooser_field_school" class="ds-text-field form-control" name="school" type="text" value=""></input>
+                                        <div data-lastpass-icon-root="true" style="position: relative !important; height: 0px !important; width: 0px !important; float: left !important;">
+                                        </div>
+                                    </div>
+                                </div>
+                                <div id="aspect_eperson_LoginChooser_item_register" class="ds-form-item row">
+                                    <div class="control-group col-sm-12">
+                                        <button id="aspect_eperson_LoginChooser_field_submit_register" class="ds-button-field btn btn-default" name="submit_register" type="submit">Register</button>
+                                    </div>
+                                </div>
+                            </fieldset>
+                            <p class="ds-paragraph">Please note that, currently, only registrations from St Andrews postgraduates are permitted.</p>
+                        </form>
                     </div>
                 </xsl:when>
                 <!-- Otherwise use default handling of body -->
