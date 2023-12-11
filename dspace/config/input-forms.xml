@@ -594,7 +594,7 @@
           <repeatable>true</repeatable>
           <label>Grant numbers</label>
           <input-type>onebox</input-type>
-          <hint>Enter the grant number(s) from your research funder(s) above</hint>
+          <hint>Enter the grant number(s) from your research funder(s) above (if applicable)</hint>
           <required></required>
         </field>
 
@@ -634,7 +634,7 @@
           <repeatable>true</repeatable>
           <label>Subject Keywords</label>
           <input-type>onebox</input-type>
-          <hint>Enter appropriate subject keywords or phrases above. Please enter one word or phrase per box.</hint>
+          <hint>Enter appropriate subject keywords or phrases above. Please enter one word or phrase per box. Maximum of 10 keywords.</hint>
           <required></required>
         </field>
 
