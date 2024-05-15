@@ -1133,6 +1133,10 @@
         <displayed-value>MFA Master of Fine Arts</displayed-value>
         <stored-value>MFA Master of Fine Arts</stored-value>
       </pair>
+      <pair>
+        <displayed-value>DPerf Doctor of Performing Arts</displayed-value>
+        <stored-value>DPerf Doctor of Performing Arts</stored-value>
+      </pair>
     </value-pairs>
 
     <!-- default language order: (from dspace 1.2.1)
