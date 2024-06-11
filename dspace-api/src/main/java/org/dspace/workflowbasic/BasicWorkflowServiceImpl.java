@@ -7,6 +7,21 @@
  */
 package org.dspace.workflowbasic;
 
+import java.io.IOException;
+import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.MissingResourceException;
+import java.util.ResourceBundle;
+import java.util.Scanner;
+import java.util.UUID;
+
+import javax.mail.MessagingException;
+
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang.StringUtils;
 import org.apache.log4j.Logger;
@@ -41,20 +56,6 @@ import org.dspace.workflowbasic.service.BasicWorkflowItemService;
 import org.dspace.workflowbasic.service.BasicWorkflowService;
 import org.dspace.workflowbasic.service.TaskListItemService;
 import org.springframework.beans.factory.annotation.Autowired;
-
-import javax.mail.MessagingException;
-import java.io.IOException;
-import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.MissingResourceException;
-import java.util.ResourceBundle;
-import java.util.Scanner;
-import java.util.UUID;
 
 public class BasicWorkflowServiceImpl implements BasicWorkflowService
 {
@@ -816,6 +817,8 @@ public class BasicWorkflowServiceImpl implements BasicWorkflowService
             Locale supportedLocale = I18nUtil.getEPersonLocale(ep);
             // Blank email
             Email email;
+            // Empty email string for multiple email concatination
+            String emailList;
 
             if(coll.getName().equals("Library Theses"))
             {
@@ -855,13 +858,14 @@ public class BasicWorkflowServiceImpl implements BasicWorkflowService
                 }
                 email.addArgument(title);
                 email.addArgument(handleService.getCanonicalForm(handle));
-                email.addRecipient(ep.getEmail());
                 if (ep.getAltEmail() != null){
-                    email.addRecipient(ep.getAltEmail());
+                    emailList = ep.getEmail() + "," + ep.getAltEmail();
+                    email.addRecipient(emailList);
                 }
-                email.addRecipientCC(DIGIREPEMAIL);
-                email.addRecipientCC(REGISTRYEMAIL);
-                email.addRecipientCC(RESEARCHEMAIL);
+                else {
+                    email.addRecipient(ep.getEmail());
+                }
+                email.addRecipientCC(DIGIREPEMAIL + ", " + REGISTRYEMAIL + ", " + RESEARCHEMAIL);
             }
             else{
                 email.setSubtype("plain");
@@ -1061,6 +1065,9 @@ public class BasicWorkflowServiceImpl implements BasicWorkflowService
                 // avoid multiple emails being sent
                 int count = 0;
 
+                // Empty email string for multiple email concatination
+                String emailList;
+
                 for (EPerson anEpa : epa)
                 {
                     // Conditional added to send different emails based on collection
@@ -1152,22 +1159,21 @@ public class BasicWorkflowServiceImpl implements BasicWorkflowService
                     else if (coll.getName().equals("Library Theses") && wi.getState() == WFSTATE_STEP2POOL)
                     {
                         e = wi.getSubmitter();
-                        email.addRecipient(e.getEmail());
                         if (e.getAltEmail() != null){
-                            email.addRecipient(e.getAltEmail());
+                            emailList = e.getEmail() + "," + e.getAltEmail();
+                            email.addRecipient(emailList);
                         }
-                        email.addRecipientCC(DIGIREPEMAIL);
-                        email.addRecipientCC(REGISTRYEMAIL);
-                        email.addRecipientCC(RESEARCHEMAIL);
+                        else {
+                            email.addRecipient(e.getEmail());
+                        }
+                        email.addRecipientCC(DIGIREPEMAIL + ", " + REGISTRYEMAIL + ", " + RESEARCHEMAIL);
 
                         count++;
                     }
                     else if (coll.getName().equals("Library Theses") && wi.getState() == WFSTATE_STEP3POOL)
                     {
                         email.addArgument(message);
-                        email.addRecipient(DIGIREPEMAIL);
-                        email.addRecipient(REGISTRYEMAIL);
-                        email.addRecipient(RESEARCHEMAIL);
+                        email.addRecipient(DIGIREPEMAIL + ", " + REGISTRYEMAIL + ", " + RESEARCHEMAIL);
 
                         count++;
                     }
@@ -1219,6 +1225,8 @@ public class BasicWorkflowServiceImpl implements BasicWorkflowService
             Locale supportedLocale = I18nUtil.getEPersonLocale(e);
 
             Email email;
+            // Empty email string for multiple email concatination
+            String emailList;
 
             if(coll.getName().equals("Library Theses"))
             {
@@ -1233,13 +1241,14 @@ public class BasicWorkflowServiceImpl implements BasicWorkflowService
 
                 email = Email.getEmail(I18nUtil.getEmailFilename(supportedLocale,template));
                 email.setSubtype("html"); // ensure html format
-                email.addRecipient(workflowItem.getSubmitter().getEmail());
                 if (workflowItem.getSubmitter().getAltEmail() != null){
-                    email.addRecipient(workflowItem.getSubmitter().getAltEmail());
+                    emailList = workflowItem.getSubmitter().getEmail() + "," + workflowItem.getSubmitter().getAltEmail();
+                    email.addRecipient(emailList);
                 }
-                email.addRecipientCC(DIGIREPEMAIL);
-                email.addRecipientCC(REGISTRYEMAIL);
-                email.addRecipientCC(RESEARCHEMAIL);
+                else {
+                    email.addRecipient(workflowItem.getSubmitter().getEmail());
+                }
+                email.addRecipientCC(DIGIREPEMAIL + ", " + REGISTRYEMAIL + ", " + RESEARCHEMAIL);
                 email.addArgument(workflowItem.getSubmitter().getFullName());
                 if (workflowItem.getSubmitter().getStudentId() != null ){
                     email.addArgument(workflowItem.getSubmitter().getStudentId());
