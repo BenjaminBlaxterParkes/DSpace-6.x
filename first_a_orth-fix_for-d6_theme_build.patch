@@ -1,0 +1,1935 @@
+From 3f687721a3cfc7f02f67baf23b4aae009a88bc1b Mon Sep 17 00:00:00 2001
+From: John Pinto <jpinto@newington.edina.ac.uk>
+Date: Tue, 11 Jun 2024 17:14:42 +0100
+Subject: [PATCH] Alan Orth's fix for migrating Mirage 2 build from bower and
+ Ruby sass to npm and node-sass.
+
+---
+ dspace-xmlui-mirage2/pom.xml                  |   2 +-
+ dspace-xmlui-mirage2/readme.md                | 162 +---
+ dspace-xmlui-mirage2/src/main/webapp/.bowerrc |   4 -
+ .../src/main/webapp/Gruntfile.js              |  36 +-
+ .../src/main/webapp/bower.json                |  17 -
+ .../src/main/webapp/config-dev.rb             |  24 -
+ .../src/main/webapp/config-prod.rb            |  24 -
+ .../src/main/webapp/config.rb                 |  36 -
+ .../src/main/webapp/package.json              |  32 +-
+ .../src/main/webapp/scripts.xml               |  42 +-
+ .../src/main/webapp/scripts/modernizr.min.js  |   8 +
+ .../classic_mirage_color_scheme/_main.scss    |  16 +-
+ .../shared/_dspace-bootstrap-tweaks.scss      |   9 +-
+ .../main/webapp/xsl/core/page-structure.xsl   | 784 +++++-------------
+ dspace/modules/xmlui-mirage2/pom.xml          | 159 +---
+ 15 files changed, 388 insertions(+), 967 deletions(-)
+ mode change 100755 => 100644 dspace-xmlui-mirage2/readme.md
+ delete mode 100755 dspace-xmlui-mirage2/src/main/webapp/.bowerrc
+ delete mode 100755 dspace-xmlui-mirage2/src/main/webapp/bower.json
+ delete mode 100755 dspace-xmlui-mirage2/src/main/webapp/config-dev.rb
+ delete mode 100755 dspace-xmlui-mirage2/src/main/webapp/config-prod.rb
+ delete mode 100755 dspace-xmlui-mirage2/src/main/webapp/config.rb
+ create mode 100644 dspace-xmlui-mirage2/src/main/webapp/scripts/modernizr.min.js
+
+diff --git a/dspace-xmlui-mirage2/pom.xml b/dspace-xmlui-mirage2/pom.xml
+index 52ea685b4..88f0f75e6 100755
+--- a/dspace-xmlui-mirage2/pom.xml
++++ b/dspace-xmlui-mirage2/pom.xml
+@@ -51,8 +51,8 @@
+                         <exclude>**/*.LICENSE</exclude>
+                         <exclude>**/*.svg</exclude>
+                         <exclude>**/readme.txt</exclude>
+-                        <exclude>**/.bowerrc</exclude>
+                         <exclude>**/dataTables.jqueryui.js</exclude>
++                        <exclude>**/modernizr.min.js</exclude>
+                     </excludes>
+                     <mapping>
+                         <!-- File extensions which are not recognized by license-maven-plugin:
+diff --git a/dspace-xmlui-mirage2/readme.md b/dspace-xmlui-mirage2/readme.md
+old mode 100755
+new mode 100644
+index 75914e947..61d27f36d
+--- a/dspace-xmlui-mirage2/readme.md
++++ b/dspace-xmlui-mirage2/readme.md
+@@ -1,193 +1,100 @@
+ # Introduction #
+ 
+-Mirage 2 is a responsive XMLUI theme for DSpace 4. It is based on the responsive theme for the [Open Knowledge Repository](https://openknowledge.worldbank.org/) by The World Bank. 
++Mirage 2 is a responsive XMLUI theme for DSpace 4. It is based on the responsive theme for the [Open Knowledge Repository](https://openknowledge.worldbank.org/) by The World Bank.
+ 
+ Like the original Mirage theme, we started from [HTML5 boilerplate](http://h5bp.com) for the basic structure of each page and best practices with regards to cross browser compatibility, accessibility and performance.
+ 
+-We used [Bootstrap 3](http://getbootstrap.com/) to have a sturdy responsive grid to base everything on. We chose the SASS version ([bootstrap-sass](https://github.com/twbs/bootstrap-sass)) because that allows us to use it in conjunction with the [Compass](http://compass-style.org/) framework, which provides a great library of SASS classes and mixins. Compass also comes with a custom version of the [SASS preprocessor](http://sass-lang.com/) we can use to concatenate and minify all stylesheets. We also included the [Handlebars](http://handlebarsjs.com/) templating framework to create more robust Javascript views.
++We used [Bootstrap 3](https://getbootstrap.com/) to have a sturdy responsive grid to base everything on. We chose the Sass version ([bootstrap-sass](https://github.com/twbs/bootstrap-sass)) because that allowed us to use it in conjunction with the [Compass](http://compass-style.org/) framework, which provides a great library of Sass classes and mixins. We also included the [Handlebars](https://handlebarsjs.com/) templating framework to create more robust Javascript views.
+ 
+-All these extra dependencies made us reconsider the way front-end dependencies were managed in Mirage 2. A common problem with themes based on the first Mirage was that its dependencies (jQuery, Modernizr, …) were outdated. The versions that came with the theme kept on being used because no-one remembered to update them when creating a new Mirage based theme. So we decided to no longer include 3rd party dependencies with the theme and instead go for a combination of [Bower](http://bower.io/) and [Grunt](http://gruntjs.com/) to fetch and combine dependencies at build time.
++All these extra dependencies made us reconsider the way front-end dependencies were managed in Mirage 2. A common problem with themes based on the first Mirage was that its dependencies (jQuery, Modernizr, …) were outdated. The versions that came with the theme kept on being used because no-one remembered to update them when creating a new Mirage based theme. So we decided to no longer include 3rd party dependencies with the theme and instead go for a combination of [bower](https://bower.io/) and [Grunt](https://gruntjs.com/) to fetch and combine dependencies at build time.
+ 
+-These new technologies are put in place to make it easier for the theme developer to produce great themes, but they come with a few new dependencies: node js and ruby. In order to make it easier to get started customizing Mirage2 we added a way to install them automatically durng a maven build.
++**Note: as of DSpace 6.4 the build used npm instead of bower for dependency resolution.**
++
++These new technologies are put in place to make it easier for the theme developer to produce great themes, but they come with a new dependency: Node.js. In order to make it easier to get started customizing Mirage 2 we added a way to install them automatically during a maven build.
+ 
+ # Installation #
+ 
+ Mirage 2 has been integrated into the standard maven build as an optional feature. It has to be explicitly enabled by setting the `mirage2.on` to `true`.
+ 
+ ```bash
+-    mvn package -Dmirage2.on=true
++mvn package -Dmirage2.on=true
+ ```
+ 
+-All extra tools in the Mirage 2 build process run on either Node.js or Ruby, so you'll need both to be able to build the theme. By default, the maven build will assume you don't have either installed and install them in a temporary sandbox every time you build the project. That's convenient, but also quite a bit slower than installing them natively. So we recommend you only use that feature to try out the theme. Afterwards, install the prerequisites and build DSpace with the `mirage2.deps.included` property set to `false`:
++All extra tools in the Mirage 2 build process run on Node.js, so you'll need that to be able to build the theme. By default, the maven build will assume you don't have Node.js installed and install it in a temporary sandbox every time you build the project. That's convenient, but also quite a bit slower than installing them natively. So we recommend you only use that feature to try out the theme. Afterwards, install the prerequisites and build DSpace with the `mirage2.deps.included` property set to `false`:
+ 
+ ```bash
+-    mvn package -Dmirage2.on=true -Dmirage2.deps.included=false
++mvn package -Dmirage2.on=true -Dmirage2.deps.included=false
+ ```
+ 
+ > *WARNING:* Git will need to be installed on the machine running the build in all cases. It will not be installed automatically
+ 
+-## Prerequisites for OSX / Linux ##
++## Prerequisites for macOS / Linux ##
+ 
+ ### Git ###
+ If you don't have git installed, go to the [git downloads page](http://git-scm.com/downloads) and follow the instructions for your OS
+ 
+ ### Node ###
+ 
+-We recommend using [nvm](https://github.com/creationix/nvm) (Node Version Manager) to install [Node.js](http://nodejs.org/), because it makes it easy to install, use and upgrade node without super user rights.
++We recommend using [nvm](https://github.com/nvm-sh/nvm) (Node Version Manager) to install [Node.js](http://nodejs.org/), because it makes it easy to install, use and upgrade node without super user rights.
+ 
+ First download and install nvm:
+ 
+ ```bash
+-    curl -o- https://raw.githubusercontent.com/creationix/nvm/v0.31.7/install.sh | bash 
++curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.38.0/install.sh | bash
+ ```
+ 
+-Then, close and reopen your terminal, and install a node version. We’ve been using v6.5.0 during the development of the theme, but it may very well work on other versions
++Then, close and reopen your terminal, and install a node version. We used v6.5.0 during the development of the theme, but it builds successfully with current [long-term support version](https://github.com/nodejs/Release#release-schedule) 12.x as well.
+ 
+ ```bash
+-    nvm install 6.5.0 
++nvm install 12
+ ```
+ 
+ Set the node version you installed as the default version.
+ 
+ ```bash
+-    nvm alias default 6.5.0
+-```
+-
+-
+-### Bower ###
+-
+-You can install [Bower](http://bower.io/) using the node package manager. The `-g` means install it globally, not as part of a specific project.
+-
+-```bash
+-    npm install -g bower
++nvm alias default 12
+ ```
+-Afterwards the command `bower` should show a help message.
+ 
+ ### Grunt ###
+ 
+-[Grunt](http://gruntjs.com/) should also be installed globally using the node package manager:
++[Grunt](https://gruntjs.com/) should also be installed globally using the node package manager:
+ 
+ ```bash
+-    npm install -g grunt && npm install -g grunt-cli 
++npm install -g grunt && npm install -g grunt-cli 
+ ```
+ 
+ Afterwards the command `grunt --version` should show the grunt-cli version number
+ 
+-### Ruby ###
+-
+-For the same reasons as with Node, we’d advise using ruby via [RVM](http://rvm.io/)  (Ruby Version Manager). Even on OSX, which comes with a version of ruby preinstalled, you can save yourself a lot of hassle by using RVM instead. (In most cases there is no need to uninstall the system ruby first). Note that **you need sudo rights to perform the RVM installation**. You won't need sudo again to use RVM, ruby or gem later on
+-
+-
+-#### OSX Ruby Note ####
+-On OSX, you need to have the XCode command line tools installed. To test if they're installed try to type `make` in your terminal, if it says "command not found" follow [these instructions](http://www.computersnyou.com/2025/2013/06/install-command-line-tools-in-osx-10-9-mavericks-how-to/) to install them  
+-(If this should fail, then you can find and download the Xcode command line tools directly from [Apple Developer site](https://developer.apple.com/downloads/index.action) - You will need an Apple id for this)
+-
+-Install RVM and ruby:
+-
+-```bash
+-    curl -sSL https://get.rvm.io | bash -s stable --ruby
+-```
+-
+-### Compass ###
+-
+-> *WARNING:* **Make sure you are using compatible versions of SASS and Compass.** For example, [Compass v0.12.0 was incompatible with SASS v3.3](https://github.com/Compass/compass/issues/1544). But, Compass v1.0.0 is compatible with SASS v3.3
+-
+-> *WARNING:* At this time, we do NOT recommend using SASS v3.4.x. The Mirage2 theme is based on [bootstrap-sass](https://github.com/twbs/bootstrap-sass), which currently has a [minor Internet Explorer breadcrumb display bug when using SASS v3.4](https://github.com/twbs/bootstrap-sass/issues/803)
+-
+-[Compass](http://compass-style.org/) is built on the [SASS CSS preprocessor](http://sass-lang.com/). At the time of writing, we recommend using SASS v3.3.14 with Compass v1.0.1 (see warnings above):
+-
+-```bash
+-    gem install sass -v 3.3.14
+-```
+-
+-Then you can install compass:
+-
+-```bash
+-    gem install compass -v 1.0.1
+-```
+-
+-Afterwards the command `compass` should show a help message.
+-
+ ## Prerequisites for Windows ##
+ 
+ ### Git ###
+-If you don't have git installed, you can download the installer [here](http://git-scm.com/download/win).
++If you don't have git installed, you can download the installer [here](https://git-scm.com/download/win).
+ 
+ ### Node ###
+ 
+-Download and install [Node.js](http://nodejs.org/) using the Windows installer version.
+-
+-### Bower ###
+-
+-You can install [Bower](http://bower.io/) using the node package manager. The `-g` means install it globally, not as part of a specific project.
+-
+-Execute following command in Windows command prompt:
+-(Open a Windows command prompt by pressing cmd-R, then type 'cmd' and enter.)
+-
+-```bash
+-    npm install -g bower
+-```
+-Afterwards the command `bower` should show a help message.
++Download and install [Node.js](https://nodejs.org/) using the Windows installer version.
+ 
+ ### Grunt ###
+ 
+-[Grunt](http://gruntjs.com/) should also be installed globally using the node package manager:
++[Grunt](https://gruntjs.com/) should also be installed globally using the node package manager:
+ 
+ Perform the following in a Windows command prompt:
+ 
+ ```bash
+-    npm install -g grunt && npm install -g grunt-cli 
++npm install -g grunt && npm install -g grunt-cli 
+ ```
+ 
+ Afterwards the command `grunt --version` should show the grunt-cli version number
+ 
+-### Ruby ###
+-
+-Download and install: [Ruby Installer](http://rubyinstaller.org/)
+-
+-Make sure its environment variables are set in system variables
+-
+-Open computer properties:
+-
+-![Step 1](documentation/sysvars1.png)
+-
+-Open "advanced sytem settings". Open "Advanced" tab, and click "environment variables":
+-
+-![Step 2](documentation/sysvars2.png)
+-
+-Add new variables `GEM_HOME` and `GEM_PATH` pointing to your Ruby gems directory.
+-
+-### Compass ###
+-
+-> *WARNING:* **Make sure you are using compatible versions of SASS and Compass.** For example, [Compass v0.12.0 was incompatible with SASS v3.3](https://github.com/Compass/compass/issues/1544). But, Compass v1.0.0 is compatible with SASS v3.3
+-
+-> *WARNING:* At this time, we do NOT recommend using SASS v3.4.x. The Mirage2 theme is based on [bootstrap-sass](https://github.com/twbs/bootstrap-sass), which currently has a [minor Internet Explorer breadcrumb display bug when using SASS v3.4](https://github.com/twbs/bootstrap-sass/issues/803)
+-
+-[Compass](http://compass-style.org/) is built on the [SASS CSS preprocessor](http://sass-lang.com/). At the time of writing, we recommend using SASS v3.3.14 with Compass v1.0.1 (see warnings above):
+-
+-Perform the following in a Windows command prompt:
+-
+-```bash
+-    gem install sass -v 3.3.14
+-```
+-
+-Then you can install compass:
+-
+-```bash
+-    gem install compass -v 1.0.1
+-```
+-
+-Afterwards the command `compass` should show a help message.
+-
+ # Enabling the theme #
+ 
+-Add the following to the `<themes>` section of  `src/dspace/config/xmlui.xconf`, replacing the currently active theme.
++Add the following to the `<themes>` section of `src/dspace/config/xmlui.xconf`, replacing the currently active theme.
+ 
+ ```xml
+-    <theme name="Mirage 2" regex=".*" path="Mirage2/" /> 
++<theme name="Mirage 2" regex=".*" path="Mirage2/" /> 
+ ```
+ 
+-Now, if you run `mvn package -Dmirage2.on=true` in the dspace project root, bower will download all Mirage 2 dependencies, and Grunt will trigger a number of plugins to preprocess, concatenate and minify all the theme's resources. 
++Now, if you run `mvn package -Dmirage2.on=true` in the dspace project root, npm will download all Mirage 2 dependencies, and Grunt will trigger a number of plugins to preprocess, concatenate and minify all the theme's resources.
+ 
+ 
+ # Customizing the theme #
+@@ -202,8 +109,6 @@ You can use Maven profiles to have Grunt build the theme in production or develo
+ 
+ In production mode, Grunt will concatenate and minify all javascript files referenced in the `Mirage2/scripts.xml` file (for more details see the javascript section of this document) in to a single `theme.js` file, to improve the performance of the theme. In development mode all javascript files will be separate and untouched, to make debugging easier.
+ 
+-Similarly for CSS, Compass will compile the CSS either using `Mirage2/config-dev.rb` or `Mirage2/config-prod.rb`. Both will yield a single css file: `main.css`, but the dev version won't be minified and will contain the scss file name and line number as a comment above each CSS rule.
+-
+ By default, Grunt will build the javascript and CSS in production mode. Use the `mirage2_dev` maven profile, or run Grunt with the `dev` task to build the theme in development mode.
+ 
+ ### Note: ###
+@@ -220,13 +125,13 @@ So we added an additional XSL transformation step in the theme’s sitemap: `pre
+ 
+ ### Tip: ###
+ 
+-When working with a DRI that has been changed by the preprocess XSLs, it is often useful to see the differences between the original DRI and the version after preprocessing. To see the original DRI you can add `DRI/` after the contextpath in a page’s URL, to see the preprocessed DRI add `?XML` after the page’s URL
++When working with a DRI that has been changed by the preprocess XSLs, it is often useful to see the differences between the original DRI and the version after preprocessing. To see the original DRI you can add `DRI/` after the contextpath in a page’s URL, to see the preprocessed DRI add `?XML` after the page’s URL.
+ 
+ # Style #
+ 
+ Mirage 2 contains two color schemes to choose from. The classic Mirage color scheme or the standard Bootstrap color scheme. By default, Grunt will build CSS to get the classic Mirage color scheme. However, by activating the `mirage2_bootstrap_color_scheme` maven profile, this can be changed to get the standard Bootstrap color scheme. 
+ 
+-The stylesheets are written in [SASS](http://sass-lang.com/). You can find them in the folder `Mirage2/styles`. Each color scheme has its own subfolder, and a `_main.scss` file that imports all others. These files will import the Compass library first. Next, all Bootstrap scss files and finally the DSpace specific files. Both color schemes also import the file `_style.scss`. It contains some example SCSS by default, and is meant to add your own style. Note that CSS is also valid SCSS, so if you don't want to learn SASS, just add plain old CSS to that file and it will work just fine.   
++The stylesheets are written in [Sass](https://sass-lang.com/). You can find them in the folder `Mirage2/styles`. Each color scheme has its own subfolder, and a `_main.scss` file that imports all others. These files will import the legacy Compass library mixins first. Next, all Bootstrap scss files and finally the DSpace specific files. Both color schemes also import the file `_style.scss`. It contains some example SCSS by default, and is meant to add your own style. Note that CSS is also valid SCSS, so if you don't want to learn Sass, just add plain old CSS to that file and it will work just fine.
+ 
+ The goal of the standard Bootstrap color scheme was to add as little extra style on top of Bootstrap as possible and instead force ourselves to solve most issues in XSL; by creating the right HTML structure and adding the right bootstrap CSS classes. But try as we might, a few additional style rules were still needed. Those can be found in `shared/_dspace-bootstrap-tweaks.scss`, most of it is limited to styles to improve the sidebar behavior on mobile devices.
+ 
+@@ -234,23 +139,20 @@ The classic Mirage color scheme contains more modifications and also overwrites
+ 
+ Take a look at [bootstrap's own variables file](https://github.com/twbs/bootstrap-sass/blob/master/assets/stylesheets/bootstrap/_variables.scss) to see which others you can overwrite.
+ 
+-If you want to base your theme on an existing Bootstrap theme (like the ones at [bootswatch.com](http://bootswatch.com)) you can do so by using the standard Bootstrap color scheme and replacing the import of Bootstrap in `bootstrap_color_scheme/_main.scss`:
++If you want to base your theme on an existing Bootstrap theme (like the ones at [bootswatch.com](https://bootswatch.com)) you can do so by using the standard Bootstrap color scheme and replacing the import of Bootstrap in `bootstrap_color_scheme/_main.scss`:
+ 
+ ```less
+-    @import "../vendor/bootstrap-sass-official/vendor/assets/stylesheets/bootstrap";
++@import "../node_modules/bootstrap-sass/assets/stylesheets/bootstrap";
+ ```
+ 
+ with an import of just its `_variables.sccs` file (those variables need to be defined, because they are used in `_dspace-bootstrap-tweaks.scss`):
+ 
+ ```less
+-    @import "../vendor/bootstrap-sass-official/vendor/assets/stylesheets/bootstrap/_variables";
++@import "../node_modules/bootstrap-sass/assets/stylesheets/bootstrap_variables";
+ ```
+ 
+ Then import the the css file(s) of your Bootstrap theme of choice below it. Depending on the theme you may also need to update the `twbs-font-path` function right above that import statement.
+ 
+-### Tip: ###
+-During development it is a hassle to always have to run `mvn package` to re-compile the style and see the result of a CSS change. Luckily Compass comes with a `watch` feature that automatically recompiles when the scss files change. If your editor can update the running webapp when you save an scss file, and you run `compass watch` in that webapp's `xmlui/themes/Mirage2` folder, changes to the style will show up nearly instantaneous.
+-
+ 
+ # Scripts #
+ 
+@@ -266,9 +168,11 @@ The theme also comes with built in support for [CoffeeScript](http://coffeescrip
+ 
+ # Managing dependencies #
+ 
+-Mirage 2's dependencies are specified in the file `Mirage2/bower.json`. Dependencies in this file should be specified according to the rules in the [Bower documentation](http://bower.io/|). Note that Bower only downloads the dependencies, nothing more. So if you add other dependencies, you'll still have to reference them. That means if it’s a CSS file, import it in `Mirage2/styles/_style.scss`, if it's a javascript file, add it to `Mirage2/scripts.xml`.
++Mirage 2's dependencies are specified in the file `Mirage2/package.json`. Dependencies in this file should be specified according to the rules in the [NPM documentation](https://docs.npmjs.com/cli/v7/configuring-npm/package-json|). Note that npm only downloads the dependencies, nothing more. So if you add other dependencies, you'll still have to reference them. That means if it’s a CSS file, import it in `Mirage2/styles/_style.scss`, if it's a javascript file, add it to `Mirage2/scripts.xml`.
++
++**Note: as of DSpace 6.4 dependencies are managed by npm in package.json. If your theme had custom packages in bower.json you should move them to package.json and update the imports accordingly (usually `vendor` to `node_modules`).**
+ 
+-We've used the the `latest` keyword to specify dependency versions in `bower.json` wherever possible because that ensures you're starting with up to date versions when creating a new theme. However once your theme is going in to production, we strongly recommend replacing `latest` with the actual version numbers being used at that moment. That way your production build won't break when a version of a dependency is released that isn't backwards compatible.
++We've used the the `latest` keyword to specify dependency versions in `package.json` wherever possible because that ensures you're starting with up to date versions when creating a new theme. However once your theme is going in to production, we strongly recommend replacing `latest` with the actual version numbers being used at that moment. That way your production build won't break when a version of a dependency is released that isn't backwards compatible.
+ 
+ # Multiple themes #
+ 
+diff --git a/dspace-xmlui-mirage2/src/main/webapp/.bowerrc b/dspace-xmlui-mirage2/src/main/webapp/.bowerrc
+deleted file mode 100755
+index 9e2cfb4fb..000000000
+--- a/dspace-xmlui-mirage2/src/main/webapp/.bowerrc
++++ /dev/null
+@@ -1,4 +0,0 @@
+-{
+-    "directory": "vendor",
+-    "registry": "https://registry.bower.io"
+-}
+diff --git a/dspace-xmlui-mirage2/src/main/webapp/Gruntfile.js b/dspace-xmlui-mirage2/src/main/webapp/Gruntfile.js
+index 943eca889..c836aed8d 100755
+--- a/dspace-xmlui-mirage2/src/main/webapp/Gruntfile.js
++++ b/dspace-xmlui-mirage2/src/main/webapp/Gruntfile.js
+@@ -9,6 +9,8 @@
+ 'use strict';
+ 
+ module.exports = function (grunt) {
++    const sass = require('node-sass');
++
+     // show elapsed time at the end
+     require('time-grunt')(grunt);
+     // load all grunt tasks
+@@ -39,20 +41,26 @@ module.exports = function (grunt) {
+                         dest: 'scripts-dist.xml'
+                     }
+                 ]
++            },
++            fonts: {
++                files: [
++                    {
++                        src: 'node_modules/bootstrap-sass/assets/fonts/bootstrap/*',
++                        expand: true,
++                        flatten: true,
++                        dest: 'fonts/bootstrap'
++                    }
++                ]
+             }
+         },
+-        compass: {
+-            prod: {
+-                options: {
+-                    config: 'config-prod.rb'
+-                }
+-
+-            },
+-            dev: {
+-                options: {
+-                    config: 'config-dev.rb'
++        sass: {
++            options: {
++                    implementation: sass
++                },
++            dist: {
++                files: {
++                    'styles/main.css': 'styles/main.scss'
+                 }
+-
+             }
+         },
+         coffee: {
+@@ -100,7 +108,7 @@ module.exports = function (grunt) {
+         'copy:bootstrap_color_scheme'
+     ]);
+     grunt.registerTask('shared-steps', [
+-        'copy:scriptsxml', 'coffee', 'handlebars', 'useminPrepare','concat'
++        'copy:scriptsxml', 'coffee', 'handlebars', 'useminPrepare','concat', 'copy:fonts'
+     ]);
+     grunt.registerTask('no-compass-prod', [
+         'shared-steps','uglify','usemin'
+@@ -109,10 +117,10 @@ module.exports = function (grunt) {
+         'shared-steps','uglify:generated'
+     ]);
+     grunt.registerTask('prod', [
+-        'compass:prod', 'no-compass-prod'
++        'sass', 'no-compass-prod'
+     ]);
+     grunt.registerTask('dev', [
+-        'compass:dev', 'no-compass-dev'
++        'classic_mirage_color_scheme', 'sass', 'no-compass-dev'
+     ]);
+     grunt.registerTask('default', [
+         'classic_mirage_color_scheme',
+diff --git a/dspace-xmlui-mirage2/src/main/webapp/bower.json b/dspace-xmlui-mirage2/src/main/webapp/bower.json
+deleted file mode 100755
+index 2af7363a4..000000000
+--- a/dspace-xmlui-mirage2/src/main/webapp/bower.json
++++ /dev/null
+@@ -1,17 +0,0 @@
+-{
+-    "name": "mirage2",
+-    "version": "0.1.2",
+-    "dependencies": {
+-        "bootstrap-sass-official": "3.3.0",
+-        "modernizr": "2.8.3",
+-        "jquery": "~1.10.2",
+-        "jquery-ui": "1.10.3",
+-        "jqueryuibootstrap": "4f3772cd37b898f456c0126c4b44178ce8d4aad7",
+-        "handlebars": "4.0.0",
+-        "respond": "1.4.2",
+-        "html5shiv": "3.7.2",
+-        "holderjs": "2.4.1",
+-        "datatables": "1.10.3"
+-    },
+-    "devDependencies": {}
+-}
+diff --git a/dspace-xmlui-mirage2/src/main/webapp/config-dev.rb b/dspace-xmlui-mirage2/src/main/webapp/config-dev.rb
+deleted file mode 100755
+index f90dd6d9b..000000000
+--- a/dspace-xmlui-mirage2/src/main/webapp/config-dev.rb
++++ /dev/null
+@@ -1,24 +0,0 @@
+-#
+-# The contents of this file are subject to the license and copyright
+-# detailed in the LICENSE and NOTICE files at the root of the source
+-# tree and available online at
+-#
+-# http://www.dspace.org/license/
+-#
+-
+-encoding = "UTF-8"
+-http_path = "/themes/bootstrap/"
+-css_path = "styles"
+-sass_path = "styles"
+-images_dir = "images"
+-generated_images_dir = "dist/images/generated"
+-javascripts_dir = "scripts"
+-fonts_dir = "styles/fonts"
+-http_images_path = "/images"
+-http_generated_images_path = "/images/generated"
+-http_fonts_path = "/styles/fonts"
+-relative_assets = false
+-asset_cache_buster = :none
+-output_style = :expanded
+-line_comments = true
+-Sass::Script::Number.precision = [10, ::Sass::Script::Number.precision].max
+\ No newline at end of file
+diff --git a/dspace-xmlui-mirage2/src/main/webapp/config-prod.rb b/dspace-xmlui-mirage2/src/main/webapp/config-prod.rb
+deleted file mode 100755
+index b14df9beb..000000000
+--- a/dspace-xmlui-mirage2/src/main/webapp/config-prod.rb
++++ /dev/null
+@@ -1,24 +0,0 @@
+-#
+-# The contents of this file are subject to the license and copyright
+-# detailed in the LICENSE and NOTICE files at the root of the source
+-# tree and available online at
+-#
+-# http://www.dspace.org/license/
+-#
+-
+-encoding = "UTF-8"
+-http_path = "/themes/bootstrap/"
+-css_path = "styles"
+-sass_path = "styles"
+-images_dir = "images"
+-generated_images_dir = "dist/images/generated"
+-javascripts_dir = "scripts"
+-fonts_dir = "styles/fonts"
+-http_images_path = "/images"
+-http_generated_images_path = "/images/generated"
+-http_fonts_path = "/styles/fonts"
+-relative_assets = false
+-asset_cache_buster = :none
+-output_style = :compressed
+-line_comments = false
+-Sass::Script::Number.precision = [10, ::Sass::Script::Number.precision].max
+\ No newline at end of file
+diff --git a/dspace-xmlui-mirage2/src/main/webapp/config.rb b/dspace-xmlui-mirage2/src/main/webapp/config.rb
+deleted file mode 100755
+index 5937e407f..000000000
+--- a/dspace-xmlui-mirage2/src/main/webapp/config.rb
++++ /dev/null
+@@ -1,36 +0,0 @@
+-#
+-# The contents of this file are subject to the license and copyright
+-# detailed in the LICENSE and NOTICE files at the root of the source
+-# tree and available online at
+-#
+-# http://www.dspace.org/license/
+-#
+-
+-# Require any additional compass plugins here.
+-
+-encoding = "UTF-8"
+-# Set this to the root of your project when deployed:
+-http_path = "/themes/bootstrap/"
+-css_dir = "styles"
+-sass_dir = "styles"
+-images_dir = "images"
+-javascripts_dir = "scripts"
+-
+-# You can select your preferred output style here (can be overridden via the command line):
+-# output_style = :expanded or :nested or :compact or :compressed
+-output_style = :expanded
+-
+-# To enable relative paths to assets via compass helper functions. Uncomment:
+-# relative_assets = true
+-
+-# To disable debugging comments that display the original location of your selectors. Uncomment:
+-line_comments = true
+-
+-
+-# If you prefer the indented syntax, you might want to regenerate this
+-# project again passing --syntax sass, or you can uncomment this:
+-# preferred_syntax = :sass
+-# and then run:
+-# sass-convert -R --from scss --to sass sass scss && rm -rf sass && mv scss sass
+-
+-Sass::Script::Number.precision = [10, ::Sass::Script::Number.precision].max
+\ No newline at end of file
+diff --git a/dspace-xmlui-mirage2/src/main/webapp/package.json b/dspace-xmlui-mirage2/src/main/webapp/package.json
+index f423274b3..ce4eab02c 100755
+--- a/dspace-xmlui-mirage2/src/main/webapp/package.json
++++ b/dspace-xmlui-mirage2/src/main/webapp/package.json
+@@ -3,23 +3,29 @@
+   "version": "0.1.2",
+   "dependencies": {},
+   "devDependencies": {
+-    "bower": "1.8.8",
+-    "grunt": "~1.0.1",
+-    "grunt-cli": "1.2.0",
+-    "grunt-contrib-coffee": "~1.0.0",
+-    "grunt-contrib-compass": "^1.1.1",
+-    "grunt-contrib-concat": "~1.0.1",
++    "bootstrap-sass": "3.3.0",
++    "compass-mixins": "^0.12.11",
++    "datatables": "1.10.5",
++    "handlebars": "4.0.11",
++    "holderjs": "2.6.0",
++    "html5shiv": "3.7.3",
++    "grunt": "^1.5.2",
++    "grunt-cli": "^1.4.3",
++    "grunt-contrib-coffee": "^2.1.0",
++    "grunt-contrib-concat": "^2.1.0",
+     "grunt-contrib-copy": "~1.0.0",
+     "grunt-contrib-handlebars": "1.0.0",
+-    "grunt-contrib-uglify": "~2.0.0",
++    "grunt-contrib-uglify": "^5.2.0",
++    "grunt-sass": "^3.1.0",
++    "node-sass": "^7.0.1",
+     "grunt-usemin": "~3.1.1",
+-    "load-grunt-tasks": "~3.5.2",
+-    "time-grunt": "~1.4.0"
+-  },
+-  "scripts": {
+-    "postinstall": "bower install"
++    "jquery": "~3.4.1",
++    "jquery-ui-dist": "^1.12.1",
++    "respond.min.js": "1.4.2",
++    "load-grunt-tasks": "^5.1.0",
++    "time-grunt": "^2.0.0"
+   },
+   "engines": {
+-    "node": ">=6.0.0 <7.0.0"
++    "node": ">=6.0.0 <15.0.0-0"
+   }
+ }
+diff --git a/dspace-xmlui-mirage2/src/main/webapp/scripts.xml b/dspace-xmlui-mirage2/src/main/webapp/scripts.xml
+index e6b4e1a23..ab8ad68ae 100755
+--- a/dspace-xmlui-mirage2/src/main/webapp/scripts.xml
++++ b/dspace-xmlui-mirage2/src/main/webapp/scripts.xml
+@@ -10,27 +10,24 @@
+ -->
+ <scripts>
+     <!-- build:js scripts/theme.js-->
+-    <script src="vendor/jquery/jquery.min.js">&#160;</script>
+-    <script src="vendor/jquery-ui/ui/jquery.ui.core.js">&#160;</script>
+-    <script src="vendor/jquery-ui/ui/jquery.ui.datepicker.js">&#160;</script>
+-    <script src="vendor/jquery-ui/ui/jquery.ui.widget.js">&#160;</script>
+-    <script src="vendor/jquery-ui/ui/jquery.ui.position.js">&#160;</script>
+-    <script src="vendor/jquery-ui/ui/jquery.ui.menu.js">&#160;</script>
+-    <script src="vendor/jquery-ui/ui/jquery.ui.autocomplete.js">&#160;</script>
+-    <script src="vendor/handlebars/handlebars.js">&#160;</script>
+-    <script src="vendor/holderjs/holder.js">&#160;</script>
+-    <!--<script src="vendor/bootstrap-sass-official/assets/javascripts/bootstrap/affix.js">&#160;</script>-->
+-    <script src="vendor/bootstrap-sass-official/assets/javascripts/bootstrap/alert.js">&#160;</script>
+-    <script src="vendor/bootstrap-sass-official/assets/javascripts/bootstrap/button.js">&#160;</script>
+-    <!--<script src="vendor/bootstrap-sass-official/assets/javascripts/bootstrap/carousel.js">&#160;</script>-->
+-    <script src="vendor/bootstrap-sass-official/assets/javascripts/bootstrap/collapse.js">&#160;</script>
+-    <script src="vendor/bootstrap-sass-official/assets/javascripts/bootstrap/dropdown.js">&#160;</script>
+-    <script src="vendor/bootstrap-sass-official/assets/javascripts/bootstrap/modal.js">&#160;</script>
+-    <!--<script src="vendor/bootstrap-sass-official/assets/javascripts/bootstrap/scrollspy.js">&#160;</script>-->
+-    <script src="vendor/bootstrap-sass-official/assets/javascripts/bootstrap/tab.js">&#160;</script>
+-    <script src="vendor/bootstrap-sass-official/assets/javascripts/bootstrap/tooltip.js">&#160;</script>
+-    <script src="vendor/bootstrap-sass-official/assets/javascripts/bootstrap/popover.js">&#160;</script>
+-    <script src="vendor/bootstrap-sass-official/assets/javascripts/bootstrap/transition.js">&#160;</script>
++    <script src="node_modules/jquery/dist/jquery.min.js">&#160;</script>
++    <script src="node_modules/jquery-ui-dist/jquery-ui.min.js">&#160;</script>
++    <script src="node_modules/handlebars/dist/handlebars.js">&#160;</script>
++    <script src="node_modules/holderjs/holder.js">&#160;</script>
++    <!--<script src="node_modules/bootstrap-sass/assets/javascripts/bootstrap/affix.js">&#160;</script>-->
++    <script src="node_modules/bootstrap-sass/assets/javascripts/bootstrap/alert.js">&#160;</script>
++    <script src="node_modules/bootstrap-sass/assets/javascripts/bootstrap/button.js">&#160;</script>
++    <!--<script src="node_modules/bootstrap-sass/assets/javascripts/bootstrap/carousel.js">&#160;</script>-->
++    <script src="node_modules/bootstrap-sass/assets/javascripts/bootstrap/collapse.js">&#160;</script>
++    <script src="node_modules/bootstrap-sass/assets/javascripts/bootstrap/dropdown.js">&#160;</script>
++    <script src="node_modules/bootstrap-sass/assets/javascripts/bootstrap/modal.js">&#160;</script>
++    <!--<script src="node_modules/bootstrap-sass/assets/javascripts/bootstrap/scrollspy.js">&#160;</script>-->
++    <script src="node_modules/bootstrap-sass/assets/javascripts/bootstrap/tab.js">&#160;</script>
++    <script src="node_modules/bootstrap-sass/assets/javascripts/bootstrap/tooltip.js">&#160;</script>
++    <script src="node_modules/bootstrap-sass/assets/javascripts/bootstrap/popover.js">&#160;</script>
++    <script src="node_modules/bootstrap-sass/assets/javascripts/bootstrap/transition.js">&#160;</script>
++    <!-- static modernizr v2.8.3 because it is six years old, not published on npm, and we don't want to use bower -->
++    <script src="scripts/modernizr.min.js">&#160;</script>
+     <script src="scripts/utils.js">&#160;</script>
+     <script src="scripts/search-controls.js">&#160;</script>
+     <script src="scripts/sidebar.js">&#160;</script>
+@@ -42,11 +39,10 @@
+     <script src="scripts/forms.js">&#160;</script>
+     <script src="scripts/vendor-extensions.js">&#160;</script>
+     <script src="scripts/google-stats-dates.js">&#160;</script>
+-    <!--<script src="scripts/script.js">&#160;</script>-->
+     <script src="scripts/templates.js">&#160;</script>
+ 
+     <!-- authorLookup and its dependencies -->
+-    <script src="vendor/datatables/media/js/jquery.dataTables.js">&#160;</script>
++    <script src="node_modules/datatables/media/js/jquery.dataTables.js">&#160;</script>
+     <script src="scripts/person-lookup.js">&#160;</script>
+ 
+     <!-- endbuild -->
+diff --git a/dspace-xmlui-mirage2/src/main/webapp/scripts/modernizr.min.js b/dspace-xmlui-mirage2/src/main/webapp/scripts/modernizr.min.js
+new file mode 100644
+index 000000000..d2256c56e
+--- /dev/null
++++ b/dspace-xmlui-mirage2/src/main/webapp/scripts/modernizr.min.js
+@@ -0,0 +1,8 @@
++/*!
++ * Modernizr v2.8.3
++ * www.modernizr.com
++ *
++ * Copyright (c) Faruk Ates, Paul Irish, Alex Sexton
++ * Available under the BSD and MIT licenses: www.modernizr.com/license/
++ */
++window.Modernizr=function(e,t,n){function r(e){b.cssText=e}function o(e,t){return r(S.join(e+";")+(t||""))}function a(e,t){return typeof e===t}function i(e,t){return!!~(""+e).indexOf(t)}function c(e,t){for(var r in e){var o=e[r];if(!i(o,"-")&&b[o]!==n)return"pfx"==t?o:!0}return!1}function s(e,t,r){for(var o in e){var i=t[e[o]];if(i!==n)return r===!1?e[o]:a(i,"function")?i.bind(r||t):i}return!1}function u(e,t,n){var r=e.charAt(0).toUpperCase()+e.slice(1),o=(e+" "+k.join(r+" ")+r).split(" ");return a(t,"string")||a(t,"undefined")?c(o,t):(o=(e+" "+T.join(r+" ")+r).split(" "),s(o,t,n))}function l(){p.input=function(n){for(var r=0,o=n.length;o>r;r++)$[n[r]]=!!(n[r]in E);return $.list&&($.list=!(!t.createElement("datalist")||!e.HTMLDataListElement)),$}("autocomplete autofocus list placeholder max min multiple pattern required step".split(" ")),p.inputtypes=function(e){for(var r,o,a,i=0,c=e.length;c>i;i++)E.setAttribute("type",o=e[i]),r="text"!==E.type,r&&(E.value=x,E.style.cssText="position:absolute;visibility:hidden;",/^range$/.test(o)&&E.style.WebkitAppearance!==n?(g.appendChild(E),a=t.defaultView,r=a.getComputedStyle&&"textfield"!==a.getComputedStyle(E,null).WebkitAppearance&&0!==E.offsetHeight,g.removeChild(E)):/^(search|tel)$/.test(o)||(r=/^(url|email)$/.test(o)?E.checkValidity&&E.checkValidity()===!1:E.value!=x)),P[e[i]]=!!r;return P}("search tel url email datetime date month week time datetime-local number range color".split(" "))}var d,f,m="2.8.3",p={},h=!0,g=t.documentElement,v="modernizr",y=t.createElement(v),b=y.style,E=t.createElement("input"),x=":)",w={}.toString,S=" -webkit- -moz- -o- -ms- ".split(" "),C="Webkit Moz O ms",k=C.split(" "),T=C.toLowerCase().split(" "),N={svg:"http://www.w3.org/2000/svg"},M={},P={},$={},D=[],j=D.slice,F=function(e,n,r,o){var a,i,c,s,u=t.createElement("div"),l=t.body,d=l||t.createElement("body");if(parseInt(r,10))for(;r--;)c=t.createElement("div"),c.id=o?o[r]:v+(r+1),u.appendChild(c);return a='&#173;<style id="s'+v+'">'+e+"</style>",u.id=v,(l?u:d).innerHTML+=a,d.appendChild(u),l||(d.style.background="",d.style.overflow="hidden",s=g.style.overflow,g.style.overflow="hidden",g.appendChild(d)),i=n(u,e),l?u.parentNode.removeChild(u):(d.parentNode.removeChild(d),g.style.overflow=s),!!i},z=function(t){var n=e.matchMedia||e.msMatchMedia;if(n)return n(t)&&n(t).matches||!1;var r;return F("@media "+t+" { #"+v+" { position: absolute; } }",function(t){r="absolute"==(e.getComputedStyle?getComputedStyle(t,null):t.currentStyle).position}),r},A=function(){function e(e,o){o=o||t.createElement(r[e]||"div"),e="on"+e;var i=e in o;return i||(o.setAttribute||(o=t.createElement("div")),o.setAttribute&&o.removeAttribute&&(o.setAttribute(e,""),i=a(o[e],"function"),a(o[e],"undefined")||(o[e]=n),o.removeAttribute(e))),o=null,i}var r={select:"input",change:"input",submit:"form",reset:"form",error:"img",load:"img",abort:"img"};return e}(),L={}.hasOwnProperty;f=a(L,"undefined")||a(L.call,"undefined")?function(e,t){return t in e&&a(e.constructor.prototype[t],"undefined")}:function(e,t){return L.call(e,t)},Function.prototype.bind||(Function.prototype.bind=function(e){var t=this;if("function"!=typeof t)throw new TypeError;var n=j.call(arguments,1),r=function(){if(this instanceof r){var o=function(){};o.prototype=t.prototype;var a=new o,i=t.apply(a,n.concat(j.call(arguments)));return Object(i)===i?i:a}return t.apply(e,n.concat(j.call(arguments)))};return r}),M.flexbox=function(){return u("flexWrap")},M.flexboxlegacy=function(){return u("boxDirection")},M.canvas=function(){var e=t.createElement("canvas");return!(!e.getContext||!e.getContext("2d"))},M.canvastext=function(){return!(!p.canvas||!a(t.createElement("canvas").getContext("2d").fillText,"function"))},M.webgl=function(){return!!e.WebGLRenderingContext},M.touch=function(){var n;return"ontouchstart"in e||e.DocumentTouch&&t instanceof DocumentTouch?n=!0:F("@media ("+S.join("touch-enabled),(")+v+"){#modernizr{top:9px;position:absolute}}",function(e){n=9===e.offsetTop}),n},M.geolocation=function(){return"geolocation"in navigator},M.postmessage=function(){return!!e.postMessage},M.websqldatabase=function(){return!!e.openDatabase},M.indexedDB=function(){return!!u("indexedDB",e)},M.hashchange=function(){return A("hashchange",e)&&(t.documentMode===n||t.documentMode>7)},M.history=function(){return!(!e.history||!history.pushState)},M.draganddrop=function(){var e=t.createElement("div");return"draggable"in e||"ondragstart"in e&&"ondrop"in e},M.websockets=function(){return"WebSocket"in e||"MozWebSocket"in e},M.rgba=function(){return r("background-color:rgba(150,255,150,.5)"),i(b.backgroundColor,"rgba")},M.hsla=function(){return r("background-color:hsla(120,40%,100%,.5)"),i(b.backgroundColor,"rgba")||i(b.backgroundColor,"hsla")},M.multiplebgs=function(){return r("background:url(https://),url(https://),red url(https://)"),/(url\s*\(.*?){3}/.test(b.background)},M.backgroundsize=function(){return u("backgroundSize")},M.borderimage=function(){return u("borderImage")},M.borderradius=function(){return u("borderRadius")},M.boxshadow=function(){return u("boxShadow")},M.textshadow=function(){return""===t.createElement("div").style.textShadow},M.opacity=function(){return o("opacity:.55"),/^0.55$/.test(b.opacity)},M.cssanimations=function(){return u("animationName")},M.csscolumns=function(){return u("columnCount")},M.cssgradients=function(){var e="background-image:",t="gradient(linear,left top,right bottom,from(#9f9),to(white));",n="linear-gradient(left top,#9f9, white);";return r((e+"-webkit- ".split(" ").join(t+e)+S.join(n+e)).slice(0,-e.length)),i(b.backgroundImage,"gradient")},M.cssreflections=function(){return u("boxReflect")},M.csstransforms=function(){return!!u("transform")},M.csstransforms3d=function(){var e=!!u("perspective");return e&&"webkitPerspective"in g.style&&F("@media (transform-3d),(-webkit-transform-3d){#modernizr{left:9px;position:absolute;height:3px;}}",function(t){e=9===t.offsetLeft&&3===t.offsetHeight}),e},M.csstransitions=function(){return u("transition")},M.fontface=function(){var e;return F('@font-face {font-family:"font";src:url("https://")}',function(n,r){var o=t.getElementById("smodernizr"),a=o.sheet||o.styleSheet,i=a?a.cssRules&&a.cssRules[0]?a.cssRules[0].cssText:a.cssText||"":"";e=/src/i.test(i)&&0===i.indexOf(r.split(" ")[0])}),e},M.generatedcontent=function(){var e;return F("#"+v+"{font:0/0 a}#"+v+':after{content:"'+x+'";visibility:hidden;font:3px/1 a}',function(t){e=t.offsetHeight>=3}),e},M.video=function(){var e=t.createElement("video"),n=!1;try{(n=!!e.canPlayType)&&(n=new Boolean(n),n.ogg=e.canPlayType('video/ogg; codecs="theora"').replace(/^no$/,""),n.h264=e.canPlayType('video/mp4; codecs="avc1.42E01E"').replace(/^no$/,""),n.webm=e.canPlayType('video/webm; codecs="vp8, vorbis"').replace(/^no$/,""))}catch(r){}return n},M.audio=function(){var e=t.createElement("audio"),n=!1;try{(n=!!e.canPlayType)&&(n=new Boolean(n),n.ogg=e.canPlayType('audio/ogg; codecs="vorbis"').replace(/^no$/,""),n.mp3=e.canPlayType("audio/mpeg;").replace(/^no$/,""),n.wav=e.canPlayType('audio/wav; codecs="1"').replace(/^no$/,""),n.m4a=(e.canPlayType("audio/x-m4a;")||e.canPlayType("audio/aac;")).replace(/^no$/,""))}catch(r){}return n},M.localstorage=function(){try{return localStorage.setItem(v,v),localStorage.removeItem(v),!0}catch(e){return!1}},M.sessionstorage=function(){try{return sessionStorage.setItem(v,v),sessionStorage.removeItem(v),!0}catch(e){return!1}},M.webworkers=function(){return!!e.Worker},M.applicationcache=function(){return!!e.applicationCache},M.svg=function(){return!!t.createElementNS&&!!t.createElementNS(N.svg,"svg").createSVGRect},M.inlinesvg=function(){var e=t.createElement("div");return e.innerHTML="<svg/>",(e.firstChild&&e.firstChild.namespaceURI)==N.svg},M.smil=function(){return!!t.createElementNS&&/SVGAnimate/.test(w.call(t.createElementNS(N.svg,"animate")))},M.svgclippaths=function(){return!!t.createElementNS&&/SVGClipPath/.test(w.call(t.createElementNS(N.svg,"clipPath")))};for(var H in M)f(M,H)&&(d=H.toLowerCase(),p[d]=M[H](),D.push((p[d]?"":"no-")+d));return p.input||l(),p.addTest=function(e,t){if("object"==typeof e)for(var r in e)f(e,r)&&p.addTest(r,e[r]);else{if(e=e.toLowerCase(),p[e]!==n)return p;t="function"==typeof t?t():t,n!==h&&h&&(g.className+=" "+(t?"":"no-")+e),p[e]=t}return p},r(""),y=E=null,function(e,t){function r(e,t){var n=e.createElement("p"),r=e.getElementsByTagName("head")[0]||e.documentElement;return n.innerHTML="x<style>"+t+"</style>",r.insertBefore(n.lastChild,r.firstChild)}function o(){var e=b.elements;return"string"==typeof e?e.split(" "):e}function a(e){var t=y[e[g]];return t||(t={},v++,e[g]=v,y[v]=t),t}function i(e,n,r){if(n||(n=t),d)return n.createElement(e);r||(r=a(n));var o;return o=r.cache[e]?r.cache[e].cloneNode():h.test(e)?(r.cache[e]=r.createElem(e)).cloneNode():r.createElem(e),!o.canHaveChildren||p.test(e)||o.tagUrn?o:r.frag.appendChild(o)}function c(e,n){if(e||(e=t),d)return e.createDocumentFragment();n=n||a(e);for(var r=n.frag.cloneNode(),i=0,c=o(),s=c.length;s>i;i++)r.createElement(c[i]);return r}function s(e,t){t.cache||(t.cache={},t.createElem=e.createElement,t.createFrag=e.createDocumentFragment,t.frag=t.createFrag()),e.createElement=function(n){return b.shivMethods?i(n,e,t):t.createElem(n)},e.createDocumentFragment=Function("h,f","return function(){var n=f.cloneNode(),c=n.createElement;h.shivMethods&&("+o().join().replace(/[\w\-]+/g,function(e){return t.createElem(e),t.frag.createElement(e),'c("'+e+'")'})+");return n}")(b,t.frag)}function u(e){e||(e=t);var n=a(e);return!b.shivCSS||l||n.hasCSS||(n.hasCSS=!!r(e,"article,aside,dialog,figcaption,figure,footer,header,hgroup,main,nav,section{display:block}mark{background:#FF0;color:#000}template{display:none}")),d||s(e,n),e}var l,d,f="3.7.0",m=e.html5||{},p=/^<|^(?:button|map|select|textarea|object|iframe|option|optgroup)$/i,h=/^(?:a|b|code|div|fieldset|h1|h2|h3|h4|h5|h6|i|label|li|ol|p|q|span|strong|style|table|tbody|td|th|tr|ul)$/i,g="_html5shiv",v=0,y={};!function(){try{var e=t.createElement("a");e.innerHTML="<xyz></xyz>",l="hidden"in e,d=1==e.childNodes.length||function(){t.createElement("a");var e=t.createDocumentFragment();return n===e.cloneNode||n===e.createDocumentFragment||n===e.createElement}()}catch(r){l=!0,d=!0}}();var b={elements:m.elements||"abbr article aside audio bdi canvas data datalist details dialog figcaption figure footer header hgroup main mark meter nav output progress section summary template time video",version:f,shivCSS:m.shivCSS!==!1,supportsUnknownElements:d,shivMethods:m.shivMethods!==!1,type:"default",shivDocument:u,createElement:i,createDocumentFragment:c};e.html5=b,u(t)}(this,t),p._version=m,p._prefixes=S,p._domPrefixes=T,p._cssomPrefixes=k,p.mq=z,p.hasEvent=A,p.testProp=function(e){return c([e])},p.testAllProps=u,p.testStyles=F,p.prefixed=function(e,t,n){return t?u(e,t,n):u(e,"pfx")},g.className=g.className.replace(/(^|\s)no-js(\s|$)/,"$1$2")+(h?" js "+D.join(" "):""),p}(this,this.document);
+\ No newline at end of file
+diff --git a/dspace-xmlui-mirage2/src/main/webapp/styles/classic_mirage_color_scheme/_main.scss b/dspace-xmlui-mirage2/src/main/webapp/styles/classic_mirage_color_scheme/_main.scss
+index babf539ba..3e6ed440c 100755
+--- a/dspace-xmlui-mirage2/src/main/webapp/styles/classic_mirage_color_scheme/_main.scss
++++ b/dspace-xmlui-mirage2/src/main/webapp/styles/classic_mirage_color_scheme/_main.scss
+@@ -5,15 +5,20 @@
+  *
+  * http://www.dspace.org/license/
+  */
+-@import "compass";
++
++/**
++ * 2022-05-05: hack to be able to use compass mixins without compass,
++ * which allows us to use a newer SASS processor instead of ruby sass.
++ */
++@import "../node_modules/compass-mixins/lib/compass";
+ // variables
+ @import "classic_mirage_color_scheme/bootstrap_variables";
+ 
+ // Bootstrap
+ @function twbs-font-path($font-name) {
+-    @return "../vendor/bootstrap-sass-official/assets/fonts/" + $font-name
++    @return "../fonts/" + $font-name
+ }
+-@import "../vendor/bootstrap-sass-official/assets/stylesheets/bootstrap";
++@import "../node_modules/bootstrap-sass/assets/stylesheets/bootstrap";
+ 
+ @import "classic_mirage_color_scheme/dspace_variables";
+ 
+@@ -32,5 +37,8 @@
+ @import "classic_mirage_color_scheme/jquery_ui";
+ @import "classic_mirage_color_scheme/dataTables.bootstrap";
+ @import "shared/dspace-bootstrap-tweaks";
+-@import "../vendor/jquery-ui/themes/base/jquery-ui.css";
++// Import without ".css" so that node-sass includes the CSS itself, rather than
++// just adding a literal "@import url(../node_modules/jquery-ui/..)" in our CSS.
++// See: https://sass-lang.com/documentation/at-rules/import#importing-css
++@import "../node_modules/jquery-ui-dist/jquery-ui";
+ @import "style";
+diff --git a/dspace-xmlui-mirage2/src/main/webapp/styles/shared/_dspace-bootstrap-tweaks.scss b/dspace-xmlui-mirage2/src/main/webapp/styles/shared/_dspace-bootstrap-tweaks.scss
+index 830242363..86ddf22f0 100755
+--- a/dspace-xmlui-mirage2/src/main/webapp/styles/shared/_dspace-bootstrap-tweaks.scss
++++ b/dspace-xmlui-mirage2/src/main/webapp/styles/shared/_dspace-bootstrap-tweaks.scss
+@@ -144,4 +144,11 @@ p.pre {
+   -ms-word-break:   break-all;
+   word-break:       break-all;
+   word-wrap:        break-word;
+-}
+\ No newline at end of file
++}
++
++// Workaround for glyphicon encoding issue with some SASS processors
++// like Ruby sass ~3.4.x, node-sass, and dart-sass.
++// See: https://github.com/twbs/bootstrap-sass/issues/919
++.breadcrumb > li + li:before {
++  content: "/\00a0";
++}
+diff --git a/dspace-xmlui-mirage2/src/main/webapp/xsl/core/page-structure.xsl b/dspace-xmlui-mirage2/src/main/webapp/xsl/core/page-structure.xsl
+index 87a585ef6..b42ca99c4 100755
+--- a/dspace-xmlui-mirage2/src/main/webapp/xsl/core/page-structure.xsl
++++ b/dspace-xmlui-mirage2/src/main/webapp/xsl/core/page-structure.xsl
+@@ -87,7 +87,7 @@
+                         </xsl:when>
+                         <xsl:otherwise>
+                             <xsl:call-template name="buildHeader"/>
+-                            <!--<xsl:call-template name="buildTrail"/>-->
++                            <xsl:call-template name="buildTrail"/>
+                             <!--javascript-disabled warning, will be invisible if javascript is enabled-->
+                             <div id="no-js-warning-wrapper" class="hidden">
+                                 <div id="no-js-warning">
+@@ -104,9 +104,9 @@
+                                         <div class="col-xs-12 col-sm-12 col-md-9 main-content">
+                                             <xsl:apply-templates select="*[not(self::dri:options)]"/>
+ 
+-                                            <!--<div class="visible-xs visible-sm">
++                                            <div class="visible-xs visible-sm">
+                                                 <xsl:call-template name="buildFooter"/>
+-                                            </div>-->
++                                            </div>
+                                         </div>
+                                         <div class="col-xs-6 col-sm-3 sidebar-offcanvas" id="sidebar" role="navigation">
+                                             <xsl:apply-templates select="dri:options"/>
+@@ -115,17 +115,13 @@
+                                     </div>
+                                 </div>
+ 
+-                            </div>
+-                            <div class="clearfix"></div>
+-                            <!--<div class="visible-xs visible-sm">
+-                                <xsl:call-template name="buildFooter"/>
+-                            </div>-->
+-                            <!--
+-                        The footer div, dropping whatever extra information is needed on the page. It will
+-                        most likely be something similar in structure to the currently given example. -->
+-                            <div class="visible-xs visible-sm visible-md visible-lg">
+-                                <xsl:call-template name="buildFooter"/>
+-                            </div>
++                                <!--
++                            The footer div, dropping whatever extra information is needed on the page. It will
++                            most likely be something similar in structure to the currently given example. -->
++                            <div class="hidden-xs hidden-sm">
++                            <xsl:call-template name="buildFooter"/>
++                             </div>
++                         </div>
+ 
+ 
+                         </xsl:otherwise>
+@@ -161,7 +157,7 @@
+             <link rel="shortcut icon">
+                 <xsl:attribute name="href">
+                     <xsl:value-of select="$theme-path"/>
+-                    <xsl:text>images/sta-favicon.ico</xsl:text>
++                    <xsl:text>images/favicon.ico</xsl:text>
+                 </xsl:attribute>
+             </link>
+             <link rel="apple-touch-icon">
+@@ -272,22 +268,16 @@
+             </script>
+ 
+             <xsl:text disable-output-escaping="yes">&lt;!--[if lt IE 9]&gt;
+-                &lt;script src="</xsl:text><xsl:value-of select="concat($theme-path, 'vendor/html5shiv/dist/html5shiv.js')"/><xsl:text disable-output-escaping="yes">"&gt;&#160;&lt;/script&gt;
+-                &lt;script src="</xsl:text><xsl:value-of select="concat($theme-path, 'vendor/respond/dest/respond.min.js')"/><xsl:text disable-output-escaping="yes">"&gt;&#160;&lt;/script&gt;
++            &lt;script src="</xsl:text><xsl:value-of select="concat($theme-path, 'scripts/html5shiv.js')"/><xsl:text disable-output-escaping="yes">"&gt;&#160;&lt;/script&gt;
++            &lt;script src="</xsl:text><xsl:value-of select="concat($theme-path, 'scripts/respond.min.js')"/><xsl:text disable-output-escaping="yes">"&gt;&#160;&lt;/script&gt;
+                 &lt;![endif]--&gt;</xsl:text>
+ 
+-            <!-- Modernizr enables HTML5 elements & feature detects -->
+-            <script src="{concat($theme-path, 'vendor/modernizr/modernizr.js')}">&#160;</script>
+-
+             <!-- Add the title in -->
+             <xsl:variable name="page_title" select="/dri:document/dri:meta/dri:pageMeta/dri:metadata[@element='title'][last()]" />
+             <title>
+                 <xsl:choose>
+-                    <xsl:when test="starts-with($request-uri, 'page/accessibility')">
+-                        Accessibility Statement
+-                    </xsl:when>
+-                    <xsl:when test="starts-with($request-uri, 'register')">
+-                        Register
++                    <xsl:when test="starts-with($request-uri, 'page/about')">
++                        <i18n:text>xmlui.mirage2.page-structure.aboutThisRepository</i18n:text>
+                     </xsl:when>
+                     <xsl:when test="not($page_title)">
+                         <xsl:text>  </xsl:text>
+@@ -305,8 +295,14 @@
+             </xsl:if>
+ 
+             <!-- Add all Google Scholar Metadata values -->
+-            <xsl:for-each select="/dri:document/dri:meta/dri:pageMeta/dri:metadata[substring(@element, 1, 9) = 'citation_']">
+-                <meta name="{@element}" content="{.}"></meta>
++            <!-- this is done in text, by design, because disabling output escaping is not allowed on attributes-->
++            <!-- while it is necessary to ensure that author names with special characters pass unescaped-->
++            <xsl:for-each select="/dri:document/dri:meta/dri:pageMeta/dri:metadata[substring(@element, 1, 9) = 'citation_']" >
++                <xsl:text disable-output-escaping="yes">&lt;meta name="</xsl:text>
++                <xsl:value-of select="@element" />
++                <xsl:text disable-output-escaping="yes">" content="</xsl:text>
++                <xsl:value-of select="." disable-output-escaping="yes" />
++                <xsl:text disable-output-escaping="yes">" /&gt;&#xa;</xsl:text>
+             </xsl:for-each>
+ 
+             <!-- Add MathJAX JS library to render scientific formulas-->
+@@ -326,42 +322,6 @@
+                 <script type="text/javascript" src="//cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML">&#160;</script>
+             </xsl:if>
+ 
+-            <!-- Add Altmetrics JS -->
+-            <!--<script type='text/javascript' src='https://d1bxh8uas1mnw7.cloudfront.net/assets/embed.js'></script>-->
+-
+-            <!-- CORE Recommender JS -->
+-            <!--<script>
+-                (function (d, s, idScript, idRec, userInput) {
+-                    var coreAddress = 'https://core.ac.uk/';
+-                    var js, fjs = d.getElementsByTagName(s)[0];
+-                    if (d.getElementById(idScript)) return;
+-                    js = d.createElement(s);
+-                    js.id = idScript;
+-                    js.src = coreAddress + 'recommender/embed.js';
+-                    fjs.parentNode.insertBefore(js, fjs);
+-
+-                    localStorage.setItem('idRecommender', idRec);
+-                    localStorage.setItem('userInput', JSON.stringify(userInput));
+-
+-                    var link = d.createElement('link');
+-                    link.setAttribute('rel', 'stylesheet');
+-                    link.setAttribute('type', 'text/css');
+-                    link.setAttribute('href', coreAddress + 'recommender/embed-default-style.css');
+-                    d.getElementsByTagName('head')[0].appendChild(link);
+-                }(document, 'script', 'recommender-embed', 'fbca3d', {}));
+-            </script>-->
+-
+-            <script  type="text/javascript">
+-                $(function()
+-                {
+-                    var a = $('.bold-test').text();
+-                    var b = a.slice(0, a.indexOf('. '));
+-                    var c = a.slice(a.indexOf('. '), a.length);
+-
+-                    $('.bold-test').html('<span class="last_bold">' + b + '</span>' + c)
+-                });
+-            </script>
+-
+         </head>
+     </xsl:template>
+ 
+@@ -371,175 +331,153 @@
+     <xsl:template name="buildHeader">
+ 
+ 
+-        <header class="sta-header">
+-            <div class="container sta-header-content">
+-                <div class="row">
+-                    <div class="col-xs-12 col-sm-8 col-md-9 sta-header-title">
+-                        <h1 class="sta-title">
+-                            <a href="{$context-path}/">
+-                                St Andrews Research Repository <span class="oblique"></span>
+-                            </a>
+-                        </h1>
+-                    </div>
+-                    <div class="col-sm-4 col-md-3 hidden-xs sta-header-logos">
+-                        <a href="//www.st-andrews.ac.uk" class="pull-right" title="St Andrews University Home">
+-                            <img src="{$theme-path}images/01-standard-black-text.png" alt="St Andrews University Home" />
++        <header>
++            <div class="navbar navbar-default navbar-static-top" role="navigation">
++                <div class="container">
++                    <div class="navbar-header">
++
++                        <button type="button" class="navbar-toggle" data-toggle="offcanvas">
++                            <span class="sr-only">
++                                <i18n:text>xmlui.mirage2.page-structure.toggleNavigation</i18n:text>
++                            </span>
++                            <span class="icon-bar"></span>
++                            <span class="icon-bar"></span>
++                            <span class="icon-bar"></span>
++                        </button>
++
++                        <a href="{$context-path}/" class="navbar-brand">
++                            <img src="{$theme-path}images/DSpace-logo-line.svg" />
+                         </a>
+-                        <!--<a id="logo" href="//www.st-andrews.ac.uk/library/" class="pull-right" title="St Andrews University Library">
+-                            <img src="{$theme-path}images/sta-library-logo.png" alt="St Andrews University Library" />
+-                        </a>-->
+-                    </div>
+-                </div>
+ 
+-                <div class="clearfix"></div>
+-            </div>
+ 
+-            <div class="navbar navbar-default navbar-static-top" role="navigation">
+-                <div class="container sta-navbar">
+-                    <div class="col-xs-12 col-sm-12 col-md-12 sta-navbar-content">
+-                        <div class="navbar-header col-md-9">
+-
+-                            <button type="button" class="navbar-toggle" data-toggle="offcanvas">
+-                                <span class="sr-only">
+-                                    <i18n:text>xmlui.mirage2.page-structure.toggleNavigation</i18n:text>
+-                                </span>
+-                                <span class="icon-bar"></span>
+-                                <span class="icon-bar"></span>
+-                                <span class="icon-bar"></span>
+-                            </button>
+-                            <!-- breadcrumbs -->
+-                            <div class="pull-left">
+-                                <xsl:choose>
+-                                    <xsl:when test="count(/dri:document/dri:meta/dri:pageMeta/dri:trail) > 1">
+-                                        <div class="breadcrumb dropdown visible-xs visible-sm">
+-                                            <a id="trail-dropdown-toggle" href="#" role="button" class="dropdown-toggle"
+-                                               data-toggle="dropdown">
+-                                                <xsl:variable name="last-node"
+-                                                              select="/dri:document/dri:meta/dri:pageMeta/dri:trail[last()]"/>
+-                                                <xsl:choose>
+-                                                    <xsl:when test="$last-node/i18n:*">
+-                                                        <xsl:apply-templates select="$last-node/*"/>
+-                                                    </xsl:when>
+-                                                    <xsl:otherwise>
+-                                                        <xsl:apply-templates select="$last-node/text()"/>
+-                                                    </xsl:otherwise>
+-                                                </xsl:choose>
+-                                                <xsl:text>&#160;</xsl:text>
+-                                                <b class="caret"/>
+-                                            </a>
+-                                            <ul class="dropdown-menu" role="menu" aria-labelledby="trail-dropdown-toggle">
+-                                                <xsl:apply-templates select="/dri:document/dri:meta/dri:pageMeta/dri:trail"
+-                                                                     mode="dropdown"/>
+-                                            </ul>
+-                                        </div>
+-                                        <div class="sta-lg-breadcrumb visible-lg hidden-md hidden-xs hidden-sm">
+-                                            <ul class="breadcrumb">
+-                                                <xsl:apply-templates select="/dri:document/dri:meta/dri:pageMeta/dri:trail"/>
+-                                            </ul>
+-                                        </div>
+-                                        <div class="sta-md-breadcrumb hidden-lg visible-md hidden-xs hidden-sm">
+-                                            <ul class="breadcrumb">
+-                                                <xsl:apply-templates select="/dri:document/dri:meta/dri:pageMeta/dri:trail"/>
+-                                            </ul>
+-                                        </div>
+-                                    </xsl:when>
+-                                    <xsl:otherwise>
+-                                        <ul class="breadcrumb">
+-                                            <xsl:apply-templates select="/dri:document/dri:meta/dri:pageMeta/dri:trail"/>
++                        <div class="navbar-header pull-right visible-xs hidden-sm hidden-md hidden-lg">
++                        <ul class="nav nav-pills pull-left ">
++
++                            <xsl:if test="count(/dri:document/dri:meta/dri:pageMeta/dri:metadata[@element='page'][@qualifier='supportedLocale']) &gt; 1">
++                                <li id="ds-language-selection-xs" class="dropdown">
++                                    <xsl:variable name="active-locale" select="/dri:document/dri:meta/dri:pageMeta/dri:metadata[@element='page'][@qualifier='currentLocale']"/>
++                                    <button id="language-dropdown-toggle-xs" href="#" role="button" class="dropdown-toggle navbar-toggle navbar-link" data-toggle="dropdown">
++                                        <b class="visible-xs glyphicon glyphicon-globe" aria-hidden="true"/>
++                                    </button>
++                                    <ul class="dropdown-menu pull-right" role="menu" aria-labelledby="language-dropdown-toggle-xs" data-no-collapse="true">
++                                        <xsl:for-each
++                                                select="/dri:document/dri:meta/dri:pageMeta/dri:metadata[@element='page'][@qualifier='supportedLocale']">
++                                            <xsl:variable name="locale" select="."/>
++                                            <li role="presentation">
++                                                <xsl:if test="$locale = $active-locale">
++                                                    <xsl:attribute name="class">
++                                                        <xsl:text>disabled</xsl:text>
++                                                    </xsl:attribute>
++                                                </xsl:if>
++                                                <a>
++                                                    <xsl:attribute name="href">
++                                                        <xsl:value-of select="$current-uri"/>
++                                                        <xsl:text>?locale-attribute=</xsl:text>
++                                                        <xsl:value-of select="$locale"/>
++                                                    </xsl:attribute>
++                                                    <xsl:value-of
++                                                            select="/dri:document/dri:meta/dri:pageMeta/dri:metadata[@element='supportedLocale'][@qualifier=$locale]"/>
++                                                </a>
++                                            </li>
++                                        </xsl:for-each>
++                                    </ul>
++                                </li>
++                            </xsl:if>
++
++                            <xsl:choose>
++                                <xsl:when test="/dri:document/dri:meta/dri:userMeta/@authenticated = 'yes'">
++                                    <li class="dropdown">
++                                        <button class="dropdown-toggle navbar-toggle navbar-link" id="user-dropdown-toggle-xs" href="#" role="button"  data-toggle="dropdown">
++                                            <b class="visible-xs glyphicon glyphicon-user" aria-hidden="true"/>
++                                        </button>
++                                        <ul class="dropdown-menu pull-right" role="menu"
++                                            aria-labelledby="user-dropdown-toggle-xs" data-no-collapse="true">
++                                            <li>
++                                                <a href="{/dri:document/dri:meta/dri:userMeta/
++                            dri:metadata[@element='identifier' and @qualifier='url']}">
++                                                    <i18n:text>xmlui.EPerson.Navigation.profile</i18n:text>
++                                                </a>
++                                            </li>
++                                            <li>
++                                                <a href="{/dri:document/dri:meta/dri:userMeta/
++                            dri:metadata[@element='identifier' and @qualifier='logoutURL']}">
++                                                    <i18n:text>xmlui.dri2xhtml.structural.logout</i18n:text>
++                                                </a>
++                                            </li>
+                                         </ul>
+-                                    </xsl:otherwise>
+-                                </xsl:choose>
+-                            </div>
+-                            <!-- extra small screen size icons -->
+-                            <div class="navbar-header pull-right visible-xs hidden-sm hidden-md hidden-lg">
+-                                <ul class="nav nav-pills pull-right">
+-                                    <!--xsl:call-template name="languageSelection-xs"/-->
+-
+-                                    <xsl:choose>
+-                                        <xsl:when test="/dri:document/dri:meta/dri:userMeta/@authenticated = 'yes'">
+-                                            <li class="dropdown">
+-                                                <button class="dropdown-toggle navbar-toggle navbar-link" id="user-dropdown-toggle-xs" href="#" role="button"  data-toggle="dropdown">
+-                                                    <b class="visible-xs glyphicon glyphicon-user" aria-hidden="true"/>
+-                                                </button>
+-                                                <ul class="dropdown-menu pull-right" role="menu" aria-labelledby="user-dropdown-toggle-xs" data-no-collapse="true">
+-                                                    <li>
+-                                                        <a href="{/dri:document/dri:meta/dri:userMeta/dri:metadata[@element='identifier' and @qualifier='url']}">
+-                                                            <i18n:text>xmlui.EPerson.Navigation.profile</i18n:text>
+-                                                        </a>
+-                                                    </li>
+-                                                    <li>
+-                                                        <a href="{/dri:document/dri:meta/dri:userMeta/dri:metadata[@element='identifier' and @qualifier='logoutURL']}">
+-                                                            <i18n:text>xmlui.dri2xhtml.structural.logout</i18n:text>
+-                                                        </a>
+-                                                    </li>
+-                                                </ul>
++                                    </li>
++                                </xsl:when>
++                                <xsl:otherwise>
++                                    <li>
++                                        <form style="display: inline" action="{/dri:document/dri:meta/dri:userMeta/
++                            dri:metadata[@element='identifier' and @qualifier='loginURL']}" method="get">
++                                            <button class="navbar-toggle navbar-link">
++                                            <b class="visible-xs glyphicon glyphicon-user" aria-hidden="true"/>
++                                            </button>
++                                        </form>
++                                    </li>
++                                </xsl:otherwise>
++                            </xsl:choose>
++                        </ul>
++                              </div>
++                    </div>
++
++                    <div class="navbar-header pull-right hidden-xs">
++                        <ul class="nav navbar-nav pull-left">
++                              <xsl:call-template name="languageSelection"/>
++                        </ul>
++                        <ul class="nav navbar-nav pull-left">
++                            <xsl:choose>
++                                <xsl:when test="/dri:document/dri:meta/dri:userMeta/@authenticated = 'yes'">
++                                    <li class="dropdown">
++                                        <a id="user-dropdown-toggle" href="#" role="button" class="dropdown-toggle"
++                                           data-toggle="dropdown">
++                                            <span class="hidden-xs">
++                                                <xsl:value-of select="/dri:document/dri:meta/dri:userMeta/
++                            dri:metadata[@element='identifier' and @qualifier='firstName']"/>
++                                                <xsl:text> </xsl:text>
++                                                <xsl:value-of select="/dri:document/dri:meta/dri:userMeta/
++                            dri:metadata[@element='identifier' and @qualifier='lastName']"/>
++                                                &#160;
++                                                <b class="caret"/>
++                                            </span>
++                                        </a>
++                                        <ul class="dropdown-menu pull-right" role="menu"
++                                            aria-labelledby="user-dropdown-toggle" data-no-collapse="true">
++                                            <li>
++                                                <a href="{/dri:document/dri:meta/dri:userMeta/
++                            dri:metadata[@element='identifier' and @qualifier='url']}">
++                                                    <i18n:text>xmlui.EPerson.Navigation.profile</i18n:text>
++                                                </a>
+                                             </li>
+-                                        </xsl:when>
+-                                        <xsl:otherwise>
+                                             <li>
+-                                                <form style="display: inline" action="{/dri:document/dri:meta/dri:userMeta/dri:metadata[@element='identifier' and @qualifier='loginURL']}" method="get">
+-                                                    <button class="navbar-toggle navbar-link">
+-                                                        <b class="visible-xs glyphicon glyphicon-user" aria-hidden="true"/>
+-                                                    </button>
+-                                                </form>
++                                                <a href="{/dri:document/dri:meta/dri:userMeta/
++                            dri:metadata[@element='identifier' and @qualifier='logoutURL']}">
++                                                    <i18n:text>xmlui.dri2xhtml.structural.logout</i18n:text>
++                                                </a>
+                                             </li>
+-                                        </xsl:otherwise>
+-                                    </xsl:choose>
+-                                </ul>
+-                            </div>
+-                        </div>
+-                        <!-- all but extra small screen size dropdown -->
+-                        <div class="navbar-header pull-right hidden-xs">
+-                            <button data-toggle="offcanvas" class="navbar-toggle visible-sm" type="button">
+-                                <span class="sr-only"><i18n:text>xmlui.mirage2.page-structure.toggleNavigation</i18n:text></span>
+-                                <span class="icon-bar"></span>
+-                                <span class="icon-bar"></span>
+-                                <span class="icon-bar"></span>
+-                            </button>
+-                            <!--ul class="nav navbar-nav pull-right">
+-                                <xsl:call-template name="languageSelection"/>
+-                            </ul-->
+-                            <ul class="nav navbar-nav pull-right sta-lg-dropdown">
+-                                <xsl:choose>
+-                                    <xsl:when test="/dri:document/dri:meta/dri:userMeta/@authenticated = 'yes'">
+-                                        <li class="dropdown">
+-                                            <a id="user-dropdown-toggle" href="#" role="button" class="dropdown-toggle"
+-                                               data-toggle="dropdown">
+-                                                <span class="hidden-xs">
+-                                                    <xsl:value-of select="/dri:document/dri:meta/dri:userMeta/dri:metadata[@element='identifier' and @qualifier='firstName']"/>
+-                                                    <xsl:text> </xsl:text>
+-                                                    <xsl:value-of select="/dri:document/dri:meta/dri:userMeta/dri:metadata[@element='identifier' and @qualifier='lastName']"/>
+-                                                    &#160;
+-                                                    <b class="caret"/>
+-                                                </span>
+-                                            </a>
+-                                            <ul class="dropdown-menu pull-right" role="menu" aria-labelledby="user-dropdown-toggle" data-no-collapse="true">
+-                                                <li>
+-                                                    <a href="{/dri:document/dri:meta/dri:userMeta/dri:metadata[@element='identifier' and @qualifier='url']}">
+-                                                        <i18n:text>xmlui.EPerson.Navigation.profile</i18n:text>
+-                                                    </a>
+-                                                </li>
+-                                                <li>
+-                                                    <a href="{/dri:document/dri:meta/dri:userMeta/dri:metadata[@element='identifier' and @qualifier='logoutURL']}">
+-                                                        <i18n:text>xmlui.dri2xhtml.structural.logout</i18n:text>
+-                                                    </a>
+-                                                </li>
+-                                            </ul>
+-                                        </li>
+-                                    </xsl:when>
+-                                    <xsl:otherwise>
+-                                        <li>
+-                                            <a href="{/dri:document/dri:meta/dri:userMeta/dri:metadata[@element='identifier' and @qualifier='loginURL']}">
+-                                                <span class="hidden-xs">
+-                                                    <i18n:text>xmlui.dri2xhtml.structural.login</i18n:text>
+-                                                </span>
+-                                            </a>
+-                                        </li>
+-                                    </xsl:otherwise>
+-                                </xsl:choose>
+-                            </ul>
++                                        </ul>
++                                    </li>
++                                </xsl:when>
++                                <xsl:otherwise>
++                                    <li>
++                                        <a href="{/dri:document/dri:meta/dri:userMeta/
++                            dri:metadata[@element='identifier' and @qualifier='loginURL']}">
++                                            <span class="hidden-xs">
++                                                <i18n:text>xmlui.dri2xhtml.structural.login</i18n:text>
++                                            </span>
++                                        </a>
++                                    </li>
++                                </xsl:otherwise>
++                            </xsl:choose>
++                        </ul>
+ 
+-                        </div>
++                        <button data-toggle="offcanvas" class="navbar-toggle visible-sm" type="button">
++                            <span class="sr-only"><i18n:text>xmlui.mirage2.page-structure.toggleNavigation</i18n:text></span>
++                            <span class="icon-bar"></span>
++                            <span class="icon-bar"></span>
++                            <span class="icon-bar"></span>
++                        </button>
+                     </div>
+                 </div>
+             </div>
+@@ -559,7 +497,7 @@
+                     <div class="col-xs-12">
+                         <xsl:choose>
+                             <xsl:when test="count(/dri:document/dri:meta/dri:pageMeta/dri:trail) > 1">
+-                                <div class="breadcrumb dropdown visible-xs visible-sm">
++                                <div class="breadcrumb dropdown visible-xs">
+                                     <a id="trail-dropdown-toggle" href="#" role="button" class="dropdown-toggle"
+                                        data-toggle="dropdown">
+                                         <xsl:variable name="last-node"
+@@ -580,7 +518,7 @@
+                                                              mode="dropdown"/>
+                                     </ul>
+                                 </div>
+-                                <ul class="breadcrumb hidden-xs hidden-sm">
++                                <ul class="breadcrumb hidden-xs">
+                                     <xsl:apply-templates select="/dri:document/dri:meta/dri:pageMeta/dri:trail"/>
+                                 </ul>
+                             </xsl:when>
+@@ -666,7 +604,7 @@
+         </xsl:variable>
+ 
+         <xsl:variable name="ccLicenseName"
+-                      select="document($externalMetadataURL)//dim:field[@element='rights' and contains(., 'Attribution')]"
++                      select="document($externalMetadataURL)//dim:field[@element='rights']"
+                 />
+         <xsl:variable name="ccLicenseUri"
+                       select="document($externalMetadataURL)//dim:field[@element='rights'][@qualifier='uri']"
+@@ -686,22 +624,19 @@
+         </xsl:variable>
+ 
+         <xsl:if test="$ccLicenseName and $ccLicenseUri and contains($ccLicenseUri, 'creativecommons')">
+-            <div about="{$handleUri}" class="row cc-license-new">
+-                <div class="col-sm-3 col-xs-12">
+-                    <a rel="license"
+-                       href="{$ccLicenseUri}"
+-                       alt="{$ccLicenseName}"
+-                       title="{$ccLicenseName}">
+-                        <img class="img-responsive">
+-                            <xsl:attribute name="src">
+-                                <xsl:value-of select="concat($theme-path,'/images/cc-ship.gif')"/>
+-                            </xsl:attribute>
+-                            <xsl:attribute name="alt">
+-                                <xsl:value-of select="$ccLicenseName"/>
+-                            </xsl:attribute>
+-                        </img>
+-                    </a>
+-                </div> <div class="col-sm-8">
++            <div about="{$handleUri}" class="row">
++            <div class="col-sm-3 col-xs-12">
++                <a rel="license"
++                   href="{$ccLicenseUri}"
++                   alt="{$ccLicenseName}"
++                   title="{$ccLicenseName}"
++                        >
++                    <xsl:call-template name="cc-logo">
++                        <xsl:with-param name="ccLicenseName" select="$ccLicenseName"/>
++                        <xsl:with-param name="ccLicenseUri" select="$ccLicenseUri"/>
++                    </xsl:call-template>
++                </a>
++            </div> <div class="col-sm-8">
+                 <span>
+                     <i18n:text>xmlui.dri2xhtml.METS-1.0.cc-license-text</i18n:text>
+                     <xsl:value-of select="$ccLicenseName"/>
+@@ -709,13 +644,6 @@
+             </div>
+             </div>
+         </xsl:if>
+-
+-        <div class="item-view-copyright item-page-field-wrapper table">
+-            <p>
+-                <i18n:text>xmlui.mirage2.itemSummaryView.Copyright</i18n:text>
+-            </p>
+-        </div>
+-
+     </xsl:template>
+ 
+     <xsl:template name="cc-logo">
+@@ -772,58 +700,41 @@
+ 
+     <!-- Like the header, the footer contains various miscellaneous text, links, and image placeholders -->
+     <xsl:template name="buildFooter">
+-        <footer class="sta-footer">
+-            <div class="sta-footer-top-content">
+-            <div class="container">
+-                <div class="row sta-footer-top">
+-                    <div class="col-md-3 footer-block">
+-                        <h3>Open Access</h3>
+-
+-                        <p>To find out how you can benefit from open access to research, see our <a href="https://www.st-andrews.ac.uk/research/support/open-research/open-access/" title="University of St Andrews Library Open Access web pages" target="_blank">library web pages</a> and <a href="//univstandrews-oaresearch.blogspot.co.uk/" title="Open Access Blog" target="_blank">Open Access blog</a>. For open access help contact: <a href="mailto:openaccess@st-andrews.ac.uk">openaccess@st-andrews.ac.uk</a>.</p>
+-                        <h3>Accessibility</h3>
+-                        <p>Read our <a href="/page/accessibility" title="Accessibility statement">Accessibility statement</a>.</p>
++        <footer>
++                <div class="row">
++                    <hr/>
++                    <div class="col-xs-7 col-sm-8">
++                        <div>
++                            <a href="http://www.dspace.org/" target="_blank" rel="noopener">DSpace software</a> copyright&#160;&#169;&#160;2002-2016&#160; <a href="http://www.duraspace.org/" target="_blank" rel="noopener">DuraSpace</a>
+                         </div>
+-                    <div class="col-md-3 footer-block">
+-                        <h3>How to submit research papers</h3>
+-                        <p>The full text of research papers can be submitted to the repository via <a href="https://www.st-andrews.ac.uk/research/support/pure/" title="Pure" target="_blank">Pure</a>, the University's research information system. For help see our guide: <a href="https://www.st-andrews.ac.uk/research/support/open-research/open-access/how-to-deposit/" title="How to deposit in Pure" target="_blank">How to deposit in Pure</a>.</p>
+-                    </div>
+-                    <div class="col-md-3 footer-block">
+-                        <h3>Electronic thesis deposit</h3>
+-                        <p>Help with <a href="https://libguides.st-andrews.ac.uk/c.php?g=669998p=5027192" target="_blank" title="Help with electronic theses deposit">deposit</a>.</p>
+-                        <h3>Repository help</h3>
+-                        <p>For repository help contact: <a href="mailto:Digital-Repository@st-andrews.ac.uk" title="Email address for St Andrews Research Repository">Digital-Repository@st-andrews.ac.uk</a>.</p>
+-                        <p><a href="/feedback" title="For sharing feedback about the St Andrews Research Repository">Give Feedback</a></p>
+-                    </div>
+-                    <div class="col-md-3 footer-block">
+-                        <h3>Cookie policy</h3>
+-                        <p>This site may use cookies. Please see <a href="//www.st-andrews.ac.uk/terms/" target="_blank" title="Terms and Conditions">Terms and Conditions</a>.</p>
+-                        <h3>Usage statistics</h3>
+-                        <p>COUNTER-compliant statistics on downloads from the repository are available from the <a href="http://irus.mimas.ac.uk/" title="IRUS-UK Service">IRUS-UK Service</a>. <a href="mailto:openaccess@st-andrews.ac.uk?subject=Enquiry%20about%20IRUS-UK%20statistics" title="Email an enquiry about IRUS-UK statistics">Contact us</a> for information.</p>
+-                    </div>
+-
+-                </div>
+-            </div>
+-            </div>
+-            <div class="sta-footer-bottom-content">
+-            <div class="container">
+-            <div class="row sta-footer-bottom">
+-                <div class="col-md-9">
+-                    <p id="footer-copyright"><xsl:text>&#169;</xsl:text> University of St Andrews Library</p>
+-                    <p id="footer-charity">University of St Andrews is a charity registered in Scotland, No SC013532.</p>
+-                </div>
+-                <div class="col-md-3">
+-                    <ul id="social">
+-                        <li>
+-                            <a href="https://www.facebook.com/uniofsta" target="_blank">
+-                                <img style="width : -1px; height : -1px; border : ; padding : ; margin : ; float : ;" alt="Facebook" src="{$theme-path}images/facebook-logo-svg.svg" />
++                        <div class="hidden-print">
++                            <a>
++                                <xsl:attribute name="href">
++                                    <xsl:value-of
++                                            select="/dri:document/dri:meta/dri:pageMeta/dri:metadata[@element='contextPath'][not(@qualifier)]"/>
++                                    <xsl:text>/contact</xsl:text>
++                                </xsl:attribute>
++                                <i18n:text>xmlui.dri2xhtml.structural.contact-link</i18n:text>
+                             </a>
+-                        </li>
+-                        <li>
+-                            <a href="https://twitter.com/univofstandrews/" target="_blank">
+-                                <img style="width : -1px; height : -1px; border : ; padding : ; margin : ; float : ;" alt="Twitter" src="{$theme-path}images/twitter-logo-svg.svg" />
++                            <xsl:text> | </xsl:text>
++                            <a>
++                                <xsl:attribute name="href">
++                                    <xsl:value-of
++                                            select="/dri:document/dri:meta/dri:pageMeta/dri:metadata[@element='contextPath'][not(@qualifier)]"/>
++                                    <xsl:text>/feedback</xsl:text>
++                                </xsl:attribute>
++                                <i18n:text>xmlui.dri2xhtml.structural.feedback-link</i18n:text>
+                             </a>
+-                        </li>
+-                    </ul>
++                        </div>
++                    </div>
++                    <div class="col-xs-5 col-sm-4 hidden-print">
++                        <div class="pull-right">
++                            <span class="theme-by">Theme by&#160;</span>
++                            <br/>
++                            <a title="Atmire NV" target="_blank" rel="noopener" href="http://atmire.com">
++                                <img alt="Atmire NV" src="{concat($theme-path, 'images/atmire-logo-small.svg')}"/>
++                            </a>
++                        </div>
+ 
+                     </div>
+                 </div>
+@@ -836,8 +747,7 @@
+                     </xsl:attribute>
+                     <xsl:text>&#160;</xsl:text>
+                 </a>
+-            </div>
+-            </div>
++            <p>&#160;</p>
+         </footer>
+     </xsl:template>
+ 
+@@ -864,247 +774,10 @@
+ 
+             <!-- Check for the custom pages -->
+             <xsl:choose>
+-                <xsl:when test="starts-with($request-uri, 'page/accessibility')">
++                <xsl:when test="starts-with($request-uri, 'page/about')">
+                     <div class="hero-unit">
+-                        <h1>Accessibility statement for the <a href="https://research-repository.st-andrews.ac.uk/">St. Andrews Research Repository</a></h1>
+-                        <p><strong>Website accessibility statement in line with Public Sector Body (Websites and Mobile Applications) (No. 2) Accessibility Regulations 2018</strong></p>
+-                        <p>This accessibility statement applies to <a href="https://research-repository.st-andrews.ac.uk/">St. Andrews Univeristy Research Repository</a> - <a href="https://research-repository.st-andrews.ac.uk/">https://research-repository.st-andrews.ac.uk/</a></p>
+-                        <p>This website is maintained by the Digital Library team, Library and University Collections, the University of Edinburgh on behalf of the St. Andrews Research Repository. We want as many people as possible to be able to use this application. For example, that means you should be able to:</p>
+-                        <ul>
+-                            <li>using your browser settings, change colours, contrast levels and fonts;</li>
+-                            <li>zoom in up to 200% without the text spilling off the screen;</li>
+-                            <li>navigate most of the website using just a keyboard;</li>
+-                            <li>listen to most of the website using a screen reader (including the most recent versions of Job Access with Speech (JAWS);</li>
+-                            <li>experience no time limits when using the site there is no flashing, scrolling or moving text.</li>
+-                        </ul>
+-                        <p>We've also made the website text as simple as possible to understand.</p>
+-
+-                        <h2>Customising the website</h2>
+-                        <p>AbilityNet has advice on making your device easier to use if you have a disability. This is an external site with suggestions to make your computer more accessible:</p>
+-                        <p><a href="https://mcmw.abilitynet.org.uk/">AbilityNet - My computer my way</a></p>
+-                        <p>With a few simple steps you can customise the appearance of our website using your browser settings to make it easier to read and navigate:</p>
+-                        <p><a href="https://www.ed.ac.uk/about/website/accessibility/customising-site">Additional information on how to customise our website appearance</a></p>
+-                        <p>If you are a member of University staff or a student, you can use the free SensusAccess accessible document conversion service:</p>
+-                        <p><a href="https://www.ed.ac.uk/student-disability-service/staff/supporting-students/accessible-technology">SenusAccess Information</a></p>
+-
+-                        <h2>How accessible this website is</h2>
+-                        <p>We know some parts of this website are not fully accessible:</p>
+-                        <ul>
+-                            <li>The website is not fully compatible with voice recognition assistive technology on all browsers;</li>
+-                            <li>It is not possible to tab through all the content on all browsers;</li>
+-                            <li>Tab highlighting can obscure the actual content;</li>
+-                            <li>Data entry and validation is not fully robust;</li>
+-                            <li>Not all hyperlinks are formatted correctly;</li>
+-                            <li>Not all colour contrasts meet the Web Content Accessibility Guidelines (WCAG) 2.1 AA standard;</li>
+-                            <li>Not all non-text content has appropriate alternative text;</li>
+-                            <li>No 'skip to main content' button is present throughout the website;</li>
+-                            <li>The website is not fully compatible with mobile accessibility functionality (Android, iOS);</li>
+-                            <li>Some PDF documents are not fully accessible;</li>
+-                            <li>Not all touch targets are a minimum of 9mm by 9mm.</li>
+-                        </ul>
+-
+-                        <h2>Feedback and contact information</h2>
+-                        <p>If you need information on this website in a different format, including accessible PDF, large print, audio recording or braille please contact:</p>
+-                        <p>Email: <a href="mailto:itservicedesk@st-andrews.ac.uk">itservicedesk@st-andrews.ac.uk</a></p>
+-                        <p>Phone: +44 (0)1334 46 3333</p>
+-                        <p>British Sign Language (BSL) users can contact us via Contact Scotland BSL, the on-line BSL interpreting service</p>
+-                        <p><a href="http://contactscotland-bsl.org/">Contact Scotland BSL</a></p>
+-                        <p>We'll consider your request and get back to you in 5 working days.</p>
+-
+-                        <h2>Reporting accessibility problems with this website</h2>
+-                        <p>We are always looking to improve the accessibility of this website. If you find any problems not listed on this page, or think we're not meeting accessibility requirements, please contact:</p>
+-                        <p>Email: <a href="mailto:itservicedesk@st-andrews.ac.uk">itservicedesk@st-andrews.ac.uk</a></p>
+-                        <p>Phone: +44 (0)1334 46 3333</p>
+-                        <p>British Sign Language (BSL) users can contact us via Contact Scotland BSL, the on-line BSL interpreting service</p>
+-                        <p><a href="http://contactscotland-bsl.org/">Contact Scotland BSL</a></p>
+-                        <p>We'll consider your request and get back to you in 5 working days.</p>
+-
+-                        <h2>Enforcement procedure</h2>
+-                        <p>The Equality and Human Rights Commission (EHRC) is responsible for enforcing the Public Sector Bodies (Websites and Mobile Applications) (No. 2) Accessibility Regulations 2018 (the 'accessibility regulations'). If you're not happy with how we respond to your complaint please contact the Equality Advisory and Support Service (EASS) directly:</p>
+-                        <p><a href="https://www.equalityadvisoryservice.com/">Contact details for the Equality Advisory and Support Service (EASS)</a></p>
+-                        <p>The government has produced information on how to report accessibility issues:</p>
+-                        <p><a href="https://www.gov.uk/reporting-accessibility-problem-public-sector-website">Reporting an accessibility problem on a public sector website</a></p>
+-
+-                        <h2>Contacting us by phone using British Sign Language</h2>
+-                        <p>British Sign Language service Contact Scotland BSL runs a service for British Sign Language users and all of Scotland's public bodies using video relay. This enables sign language users to contact public bodies and vice versa. The service operates 24 hours a day, 7 days a week.</p>
+-                        <p><a href="https://contactscotland-bsl.org/">British Sign Language Scotland service details</a></p>
+-
+-                        <h2>Technical information about this website's accessibility</h2>
+-                        <p>The University of Edinburgh is committed to making its websites and applications accessible, in accordance with the Public Sector Bodies (Websites and Mobile Applications) (No. 2) Accessibility Regulations 2018.</p>
+-                        <p>This website is partially compliant with the Web Content Accessibility Guidelines (WCAG) 2.1 AA standard, due to the non-compliances listed below.</p>
+-                        <p>The full guidelines are available at</p>
+-                        <p><a href="https://www.w3.org/TR/WCAG21/">Web Content Accessibility Guidelines (WCAG) 2.1 AA standard</a></p>
+-
+-                        <h2>Non accessible content</h2>
+-                        <p>The content listed below is non-accessible for the following reasons.</p>
+-                        <p>Noncompliance with the accessibility regulations.</p>
+-                        <p>The following items to not comply with the WCAG 2.1 AA success criteria:</p>
+-                        <ul>
+-                            <li>Some non-text content does not have text alternatives</li>
+-                            <ul>
+-                                <li><u><a href="https://www.w3.org/TR/WCAG21/#non-text-content">1.1.1 - Non-text Content</a></u></li>
+-                            </ul>
+-                        </ul>
+-                        <ul>
+-                            <li>There are missing form labels</li>
+-                            <ul>
+-                                <li><u><a href="https://www.w3.org/TR/WCAG21/#info-and-relationships">1.3.1 - Info and Relationships</a></u></li>
+-                            </ul>
+-                        </ul>
+-                        <ul>
+-                            <li>There may not be sufficient colour contrast between font and background colours, there are issues where text size is very small</li>
+-                            <ul>
+-                                <li><u><a href="https://www.w3.org/TR/WCAG21/#visual-audio-contrast-contrast">1.4.3 - Contrast (Minimum)</a></u></li>
+-                            </ul>
+-                        </ul>
+-                        <ul>
+-                            <li>Not all foreground and background colours can be selected by the user</li>
+-                            <ul>
+-                                <li><u><a href="https://www.w3.org/TR/WCAG21/#visual-presentation">1.4.8 - Visual Presentation (Level AAA)</a></u></li>
+-                            </ul>
+-                        </ul>
+-                        <ul>
+-                            <li>Not all the content reflows when the page is magnified above 200%</li>
+-                            <ul>
+-                                <li><u><a href="https://www.w3.org/TR/WCAG21/#reflow">1.4.10 - Reflow</a></u></li>
+-                            </ul>
+-                        </ul>
+-                        <ul>
+-                            <li>Tooltips are not present for all icons and images</li>
+-                            <ul>
+-                                <li><u><a href="https://www.w3.org/TR/WCAG21/#content-on-hover-or-focus">1.4.13 - Content on Hover or Focus</a></u></li>
+-                            </ul>
+-                        </ul>
+-                        <ul>
+-                            <li>There is no 'skip to main content' option available throughout the website</li>
+-                            <ul>
+-                                <li><u><a href="https://www.w3.org/TR/WCAG21/#bypass-blocks">2.4.1 - Bypass Blocks</a></u></li>
+-                            </ul>
+-                        </ul>
+-                        <ul>
+-                            <li>The purpose of each link can not be determined from the text alone</li>
+-                            <ul>
+-                                <li><u><a href="https://www.w3.org/TR/WCAG21/#link-purpose-in-context">2.4.4 - Link Purpose (In Context)</a></u></li>
+-                            </ul>
+-                        </ul>
+-                        <ul>
+-                            <li>There are missing heading levels</li>
+-                            <ul>
+-                                <li><u><a href="https://www.w3.org/TR/WCAG21/#headings-and-labels">2.4.6 - Headings and Labels</a></u></li>
+-                            </ul>
+-                        </ul>
+-                        <ul>
+-                            <li>Visual information to identify user interface components, such as keyboard focus, do not always have a sufficient contrast ratio</li>
+-                            <ul>
+-                                <li><u><a href="https://www.w3.org/TR/WCAG21/#focus-visible">2.4.6 - Focus Visible</a></u></li>
+-                            </ul>
+-                        </ul>
+-                        <ul>
+-                            <li>There are missing labels present in the website that fail to describe the purpose of the input form</li>
+-                            <ul>
+-                                <li><u><a href="https://www.w3.org/TR/WCAG21/#labels-or-instructions">3.3.2 - Labels or Instruction</a></u></li>
+-                            </ul>
+-                        </ul>
+-                        <ul>
+-                            <li>Error suggestions or corrections are not always displayed</li>
+-                            <ul>
+-                                <li><u><a href="https://www.w3.org/TR/WCAG21/#error-suggestion">3.3.3 - Error Suggestion</a></u></li>
+-                            </ul>
+-                        </ul>
+-                        <ul>
+-                            <li>Voice recognition software was unable to identify some parts of the page</li>
+-                            <ul>
+-                                <li><u><a href="https://www.w3.org/TR/WCAG21/#parsing">4.1.1 - Parsing</a></u></li>
+-                                <li><u><a href="https://www.w3.org/TR/WCAG21/#name-role-value">4.1.2 - Name, Role, Value</a></u></li>
+-                            </ul>
+-                        </ul>
+-                        <ul>
+-                            <li>There are PDF's that are not currently accessible</li>
+-                            <ul>
+-                                <li><u><a href="https://www.w3.org/TR/WCAG21/#parsing">4.1.1 - Parsing</a></u></li>
+-                                <li><u><a href="https://www.w3.org/TR/WCAG21/#name-role-value">4.1.2 - Name, Role, Value</a></u></li>
+-                            </ul>
+-                        </ul>
+-                        <p>Unless specified otherwise, a complete solution, or significant improvement, will be in place by December 2023. At this time, we believe all items are within our control.</p>
+-
+-                        <h2>Disproportionate burden</h2>
+-                        <p>We are not currently claiming that any accessibility problems would be a disproportionate burden to fix.</p>
+-
+-                        <h2>Content that is not within the Scope of the Accessibility Regulations</h2>
+-                        <p>At this time, we do not believe that any content is outside the scope of the accessibility regulations.</p>
+-
+-                        <h2>What we're doing to improve accessibility</h2>
+-                        <p>We will continue to address and make adequate improvements to the accessibility issues highlighted. Unless specified otherwise, a complete solution or significant improvement will be in place by December 2023.</p>
+-                        <p>While we are in the process of resolving these accessibility issues we will ensure reasonable adjustments are in place to make sure no user is disadvantaged. As changes are made, we will continue to review accessibility and retest the accessibility of this website.</p>
+-                        <p>We are planning to upgrade the site to the most recent release of the system architecture before the end of 2023 which includes improvements to the current accessibility requirements. During this upgrade improving the other accessibility issues highlighted will be a key component of the development process.</p>
+-
+-                        <h2>Preparation of this accessibility statement</h2>
+-                        <p>This statement was first prepared on 4th October 2021. It was last reviewed on 9th January 2023.</p>
+-                        <p>This website was first tested on 4th October 2021 and was last tested on 9th August 2022. The test was carried out by The University Library and University of Edinburgh Collections Digital Library Development team using the automated <a href="https://wave.webaim.org/">Wave WEBAIM</a> tool and <a href="https://littleforest.co.uk/">Little Forest</a> testing.</p>
+-                        <p>This website was last tested by the Digital Library team, Library and University Collections, University of Edinburgh on the 9th August 2022 following on from previous automated testing of the system the previous year. This was primarily using the Google Chrome (100.0.4896.127), Mozilla Firefox (91.8.0esr), Internet Explorer (11.0) and Microsoft Edge (100.0.1185.39) browsers for comparative purposes.</p>
+-                        <p>Recent world-wide usage levels survey for different screen readers and browsers shows that Chrome, Mozilla Firefox and Microsoft Edge are increasing in popularity and Google Chrome is now the favoured browser for screen readers:</p>
+-                        <p><a href="https://webaim.org/projects/screenreadersurvey9/">WebAIM: Screen Reader User Survey</a></p>
+-                        <p>The aforementioned three browsers have been used in certain questions for reasons of breadth and variety.</p>
+-                        <p>We ran automated testing using <a href="https://wave.webaim.org/">Wave WEBAIM</a> and then manual testing that included:</p>
+-                        <ul>
+-                            <li>Spell check functionality;</li>
+-                            <li>Scaling using different resolutions and reflow;</li>
+-                            <li>Options to customise the interface (magnification, font, background colour, etc);</li>
+-                            <li>Keyboard navigation and keyboard traps;</li>
+-                            <li>Data validation;</li>
+-                            <li>Warning of links opening in new tab or window;</li>
+-                            <li>Information conveyed in the colour or sound only;</li>
+-                            <li>Flashing, moving or scrolling text;</li>
+-                            <li>Operability if JavaScript is disabled;</li>
+-                            <li>Use with screen reading software (for example JAWS);</li>
+-                            <li>Assistive software (TextHelp Read and Write, Windows Magnifier, ZoomText, Dragon Naturally Speaking, TalkBack and VoiceOver);</li>
+-                            <li>Tooltips and text alternatives for any non-text content;</li>
+-                            <li>Time limits;</li>
+-                            <li>Compatibility with mobile accessibility functionality (Android and iOS).</li>
+-                        </ul>
+-
+-                        <h2>Change Log</h2>
+-                        <p>Since our first evaluation and statement which was based on automated testing we have been doing extensive manual testing including with a range of assistive technology to ensure we have a clear picture of the accessibility issues and how best to resolve them.</p>
+-                    </div>
+-                </xsl:when>
+-                <xsl:when test="starts-with($request-uri, 'register')">
+-                    <div class="hero-unit">
+-                        <form id="aspect_eperson_LoginChooser_div_login" class="ds-interactive-div primary" action="/ldap-login" method="post" onsubmit="javascript:tSubmit(this);" data-gtm-form-interact-id="0">
+-                            <h1 class="ds-div-head">New User Registrations</h1>
+-                            <div id="aspect_eperson_LoginChooser_div_register_header" class="ds-static-div">
+-                                <p class="ds-paragraph">
+-                                <strong>To register</strong> with the St Andrews Research Repository to submit an electronic thesis please enter your standard St Andrews Username and Password in the boxes above, give any preferred current contact email address and details of your school and department in the fields below.</p>
+-                                <p class="ds-paragraph">
+-                                <strong>Please click on the white Register button</strong> at the very bottom which will send your registration details to the Repository Administrator. We will complete your registration and send confirmation to you as soon as we can. We will send the confirmation to your St Andrews email address unless you indicate a preferred contact email.</p>
+-                                <p class="ds-paragraph">Please note that you will not be able to make a submission until you receive this confirmation, so please log out of the St Andrews Research Repository after you have completed this initial registration.</p>
+-                                <p class="ds-paragraph">
+-                                <strong>Once you have received acknowledgement</strong> of your registration you can login again using your St Andrews Username and Password to make your submission.</p>
+-                            </div>
+-                            <fieldset id="aspect_eperson_LoginChooser_list_registration" class="col ds-form-list">
+-                                <div class="ds-form-item row">
+-                                    <div class="control-group col-sm-12">
+-                                        <label class="control-label" for="aspect_eperson_LoginChooser_field_customemail">Preferred contact email(Optional): </label>
+-                                        <input id="aspect_eperson_LoginChooser_field_customemail" class="ds-text-field form-control" name="customemail" type="text" value="" autofocus="autofocus"></input>
+-                                        <div data-lastpass-icon-root="true" style="position: relative !important; height: 0px !important; width: 0px !important; float: left !important;">
+-                                        </div>
+-                                    </div>
+-                                </div>
+-                                <div class="ds-form-item row">
+-                                    <div class="control-group col-sm-12">
+-                                        <label class="control-label" for="aspect_eperson_LoginChooser_field_school">School and/or Department(Mandatory) </label>
+-                                        <input id="aspect_eperson_LoginChooser_field_school" class="ds-text-field form-control" name="school" type="text" value=""></input>
+-                                        <div data-lastpass-icon-root="true" style="position: relative !important; height: 0px !important; width: 0px !important; float: left !important;">
+-                                        </div>
+-                                    </div>
+-                                </div>
+-                                <div id="aspect_eperson_LoginChooser_item_register" class="ds-form-item row">
+-                                    <div class="control-group col-sm-12">
+-                                        <button id="aspect_eperson_LoginChooser_field_submit_register" class="ds-button-field btn btn-default" name="submit_register" type="submit">Register</button>
+-                                    </div>
+-                                </div>
+-                            </fieldset>
+-                            <p class="ds-paragraph">Please note that, currently, only registrations from St Andrews postgraduates are permitted.</p>
+-                        </form>
++                        <h1><i18n:text>xmlui.mirage2.page-structure.heroUnit.title</i18n:text></h1>
++                        <p><i18n:text>xmlui.mirage2.page-structure.heroUnit.content</i18n:text></p>
+                     </div>
+                 </xsl:when>
+                 <!-- Otherwise use default handling of body -->
+@@ -1203,22 +876,19 @@
+     </xsl:template>
+ 
+     <xsl:template name="addJavascript-google-analytics">
+-	<!-- Add a google analytics script if the key is present -->
+-    	<xsl:if test="/dri:document/dri:meta/dri:pageMeta/dri:metadata[@element='google'][@qualifier='analytics']">
+-        <script>
+-            <xsl:attribute name="async">true</xsl:attribute>
+-            <xsl:attribute name="src"><xsl:text>https://www.googletagmanager.com/gtag/js?id=</xsl:text><xsl:value-of select="/dri:document/dri:meta/dri:pageMeta/dri:metadata[@element='google'][@qualifier='analytics']"/></xsl:attribute>
+-        </script>
+-        <script><xsl:text>
+-            window.dataLayer = window.dataLayer || [];
+-            function gtag(){dataLayer.push(arguments);}
+-            gtag('js', new Date());
+-
+-            gtag('config', '</xsl:text><xsl:value-of select="/dri:document/dri:meta/dri:pageMeta/dri:metadata[@element='google'][@qualifier='analytics']"/><xsl:text>');</xsl:text>
+-        </script>
+-    </xsl:if>
+-</xsl:template>
+-
++        <!-- Add a google analytics script if the key is present -->
++        <xsl:if test="/dri:document/dri:meta/dri:pageMeta/dri:metadata[@element='google'][@qualifier='analytics']">
++            <script><xsl:text>
++                (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
++                (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
++                m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
++                })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
++
++                ga('create', '</xsl:text><xsl:value-of select="/dri:document/dri:meta/dri:pageMeta/dri:metadata[@element='google'][@qualifier='analytics']"/><xsl:text>', '</xsl:text><xsl:value-of select="/dri:document/dri:meta/dri:pageMeta/dri:metadata[@element='request'][@qualifier='serverName']"/><xsl:text>');
++                ga('send', 'pageview');
++            </xsl:text></script>
++        </xsl:if>
++    </xsl:template>
+ 
+     <!--The Language Selection
+         Uses a page metadata curRequestURI which was introduced by in /xmlui-mirage2/src/main/webapp/themes/Mirage2/sitemap.xmap-->
+diff --git a/dspace/modules/xmlui-mirage2/pom.xml b/dspace/modules/xmlui-mirage2/pom.xml
+index 12b041b05..3bc63a314 100755
+--- a/dspace/modules/xmlui-mirage2/pom.xml
++++ b/dspace/modules/xmlui-mirage2/pom.xml
+@@ -16,19 +16,15 @@
+         <relativePath>..</relativePath>
+     </parent>
+ 
+-    <properties>
++ <properties>
+         <!-- This is the path to the root [dspace-src] directory. -->
+         <root.basedir>${basedir}/../../..</root.basedir>
+         <grunt.environment>prod</grunt.environment>
+         <grunt.color.scheme>classic_mirage_color_scheme</grunt.color.scheme>
+         <mirage2.deps.included>true</mirage2.deps.included>
+         <!-- Versions of build dependencies to be auto-installed when "mirage2.deps.included=true" -->
+-        <sass.version>3.4.25</sass.version>
+-        <compass.version>1.0.1</compass.version>
+-        <node.version>6.5.0</node.version>
+-        <npm.version>3.10.8</npm.version>
+-        <!-- Override version of JRuby that gem-maven-plugin installs when "mirage2.deps.included=true" -->
+-        <jruby.version>9.1.17.0</jruby.version>
++        <!-- These versions should be kept in sync with ./.travis.yml -->
++        <node.version>14.19.3</node.version>
+     </properties>
+ 
+     <build>
+@@ -66,57 +62,6 @@
+                     </execution>
+                 </executions>
+             </plugin>
+-            <plugin>
+-                <groupId>org.apache.maven.plugins</groupId>
+-                <artifactId>maven-resources-plugin</artifactId>
+-                <executions>
+-                    <execution>
+-                        <goals>
+-                            <goal>copy-resources</goal>
+-                        </goals>
+-                        <phase>process-resources</phase>
+-                        <configuration>
+-                            <outputDirectory>${project.build.directory}/themes</outputDirectory>
+-                            <resources>
+-                                <resource>
+-                                    <directory>${basedir}/src/main/webapp/themes</directory>
+-                                    <excludes>
+-                                        <exclude>**/*.bmp</exclude>
+-                                        <exclude>**/*.jpg</exclude>
+-                                        <exclude>**/*.jpeg</exclude>
+-                                        <exclude>**/*.gif</exclude>
+-                                        <exclude>**/*.png</exclude>
+-                                        <exclude>**/*.ico</exclude>
+-                                        <exclude>**/*.svg</exclude>
+-                                        <exclude>**/*.ttf</exclude>
+-                                        <exclude>**/*.woff</exclude>
+-                                        <exclude>**/*.eot</exclude>
+-                                        <exclude>**/*.xsl</exclude>
+-                                    </excludes>
+-                                    <filtering>true</filtering>
+-                                </resource>
+-                                <resource>
+-                                    <directory>${basedir}/src/main/webapp/themes</directory>
+-                                    <includes>
+-                                        <include>**/*.bmp</include>
+-                                        <include>**/*.jpg</include>
+-                                        <include>**/*.jpeg</include>
+-                                        <include>**/*.gif</include>
+-                                        <include>**/*.png</include>
+-                                        <include>**/*.ico</include>
+-                                        <include>**/*.svg</include>
+-                                        <include>**/*.ttf</include>
+-                                        <include>**/*.woff</include>
+-                                        <include>**/*.eot</include>
+-                                        <include>**/*.xsl</include>
+-                                    </includes>
+-                                    <filtering>false</filtering>
+-                                </resource>
+-                            </resources>
+-                        </configuration>
+-                    </execution>
+-                </executions>
+-            </plugin>
+             <plugin>
+                 <groupId>org.apache.maven.plugins</groupId>
+                 <artifactId>maven-antrun-plugin</artifactId>
+@@ -129,8 +74,6 @@
+                         <configuration>
+                             <tasks>
+                                 <echo>PATH=${env.PATH}</echo>
+-                                <echo>GEM_PATH=${env.GEM_PATH}</echo>
+-                                <echo>GEM_HOME=${env.GEM_HOME}</echo>
+                                 <echo>mirage2.deps.included=${mirage2.deps.included}</echo>
+                                 <echo>grunt.color.scheme=${grunt.color.scheme}</echo>
+                                 <echo>grunt.environment=${grunt.environment}</echo>
+@@ -232,12 +175,20 @@
+                                                 <overwrite>false</overwrite>
+                                                 <resources>
+                                                     <resource>
++                                                        <!--  this is in dspace/modules/xmlui-mirage2/target/mirage2-source-extracted -->
+                                                         <directory>${project.build.directory}/mirage2-source-extracted</directory>
+                                                         <filtering>false</filtering>
+                                                         <excludes>
+                                                             <exclude>sitemap.xmap</exclude>
+                                                         </excludes>
+                                                     </resource>
++                                                    <resource>
++                                                        <directory>${project.build.directory}/mirage2-source-extracted</directory>
++                                                        <filtering>true</filtering>
++                                                        <includes>
++                                                            <include>sitemap.xmap</include>
++                                                        </includes>
++                                                    </resource>
+                                                 </resources>
+                                             </configuration>
+                                         </pluginExecutor>
+@@ -249,10 +200,17 @@
+                                             <goal>copy-resources</goal>
+                                             <configuration>
+                                                 <outputDirectory>${project.build.directory}/themes/@item@</outputDirectory>
+-                                                <overwrite>false</overwrite>
++                                                <overwrite>true</overwrite>
+                                                 <resources>
+                                                     <resource>
+-                                                        <directory>${project.build.directory}/mirage2-source-extracted</directory>
++                                                        <directory>${basedir}/src/main/webapp/themes/@item@</directory>
++                                                        <filtering>false</filtering>
++                                                        <excludes>
++                                                            <exclude>sitemap.xmap</exclude>
++                                                        </excludes>
++                                                    </resource>
++                                                    <resource>
++                                                        <directory>${basedir}/src/main/webapp/themes/@item@</directory>
+                                                         <filtering>true</filtering>
+                                                         <includes>
+                                                             <include>sitemap.xmap</include>
+@@ -295,8 +253,6 @@
+                                                 </workingDirectory>
+                                                 <environmentVariables>
+                                                     <PATH>${env.PATH}</PATH>
+-                                                    <GEM_PATH>${env.GEM_PATH}</GEM_PATH>
+-                                                    <GEM_HOME>${env.GEM_HOME}</GEM_HOME>
+                                                     <LC_CTYPE>UTF-8</LC_CTYPE>
+                                                 </environmentVariables>
+                                             </configuration>
+@@ -322,54 +278,18 @@
+                     <value>true</value>
+                 </property>
+             </activation>
+-            <repositories>
+-                <repository>
+-                    <id>rubygems-release</id>
+-                    <url>http://rubygems-proxy.torquebox.org/releases</url>
+-                </repository>
+-            </repositories>
+-            <dependencies>
+-                <dependency>
+-                    <groupId>rubygems</groupId>
+-                    <artifactId>sass</artifactId>
+-                    <version>${sass.version}</version>
+-                    <type>gem</type>
+-                </dependency>
+-                <dependency>
+-                    <groupId>rubygems</groupId>
+-                    <artifactId>compass</artifactId>
+-                    <version>${compass.version}</version>
+-                    <type>gem</type>
+-                </dependency>
+-            </dependencies>
+             <build>
+                 <!-- Centrally manage the versions of all plugins used by this profile -->
+                 <pluginManagement>
+                     <plugins>
+-                        <plugin>
+-                            <groupId>de.saumya.mojo</groupId>
+-                            <artifactId>gem-maven-plugin</artifactId>
+-                            <version>1.0.6</version>
+-                        </plugin>
+                         <plugin>
+                             <groupId>com.github.eirslett</groupId>
+                             <artifactId>frontend-maven-plugin</artifactId>
+-                            <version>1.0</version>
++                            <version>1.12.1</version>
+                         </plugin>
+                     </plugins>
+                 </pluginManagement>
+                 <plugins>
+-                    <plugin>
+-                        <groupId>de.saumya.mojo</groupId>
+-                        <artifactId>gem-maven-plugin</artifactId>
+-                        <executions>
+-                            <execution>
+-                                <goals>
+-                                    <goal>initialize</goal>
+-                                </goals>
+-                            </execution>
+-                        </executions>
+-                    </plugin>
+                     <plugin>
+                         <groupId>com.soebes.maven.plugins</groupId>
+                         <artifactId>iterator-maven-plugin</artifactId>
+@@ -400,6 +320,13 @@
+                                                             <exclude>sitemap.xmap</exclude>
+                                                         </excludes>
+                                                     </resource>
++                                                    <resource>
++                                                        <directory>${project.build.directory}/mirage2-source-extracted</directory>
++                                                        <filtering>true</filtering>
++                                                        <includes>
++                                                            <include>sitemap.xmap</include>
++                                                        </includes>
++                                                    </resource>
+                                                 </resources>
+                                             </configuration>
+                                         </pluginExecutor>
+@@ -411,10 +338,17 @@
+                                             <goal>copy-resources</goal>
+                                             <configuration>
+                                                 <outputDirectory>${project.build.directory}/themes/@item@</outputDirectory>
+-                                                <overwrite>false</overwrite>
++                                                <overwrite>true</overwrite>
+                                                 <resources>
+                                                     <resource>
+-                                                        <directory>${project.build.directory}/mirage2-source-extracted</directory>
++                                                        <directory>${basedir}/src/main/webapp/themes/@item@</directory>
++                                                        <filtering>false</filtering>
++                                                        <excludes>
++                                                            <exclude>sitemap.xmap</exclude>
++                                                        </excludes>
++                                                    </resource>
++                                                    <resource>
++                                                        <directory>${basedir}/src/main/webapp/themes/@item@</directory>
+                                                         <filtering>true</filtering>
+                                                         <includes>
+                                                             <include>sitemap.xmap</include>
+@@ -434,11 +368,9 @@
+                                             <configuration>
+                                                 <workingDirectory>${project.build.directory}/themes/@item@</workingDirectory>
+                                                 <nodeVersion>v${node.version}</nodeVersion>
+-                                                <npmVersion>${npm.version}</npmVersion>
+                                             </configuration>
+                                         </pluginExecutor>
+                                         <pluginExecutor>
+-                                            <!--<id>npm install &amp;&amp; bower install</id>-->
+                                             <plugin>
+                                                 <groupId>com.github.eirslett</groupId>
+                                                 <artifactId>frontend-maven-plugin</artifactId>
+@@ -459,24 +391,11 @@
+                                             <goal>grunt</goal>
+                                             <!--<phase>prepare-package</phase>-->
+                                             <configuration>
+-                                                <arguments>${grunt.color.scheme} no-compass-${grunt.environment}
++                                                <arguments>${grunt.color.scheme} ${grunt.environment}
+                                                 </arguments>
+                                                 <workingDirectory>${project.build.directory}/themes/@item@</workingDirectory>
+                                             </configuration>
+                                         </pluginExecutor>
+-                                        <pluginExecutor>
+-                                            <plugin>
+-                                                <groupId>de.saumya.mojo</groupId>
+-                                                <artifactId>gem-maven-plugin</artifactId>
+-                                            </plugin>
+-                                            <goal>exec</goal>
+-                                            <configuration>
+-                                                <launchDirectory>${project.build.directory}/themes/@item@</launchDirectory>
+-                                                <execArgs>${project.build.directory}/rubygems/bin/compass compile -c
+-                                                    config-${grunt.environment}.rb
+-                                                </execArgs>
+-                                            </configuration>
+-                                        </pluginExecutor>
+                                     </pluginExecutors>
+                                 </configuration>
+                             </execution>
+@@ -509,4 +428,4 @@
+         </dependency>
+     </dependencies>
+ 
+-</project>
++</project>
+\ No newline at end of file
+-- 
+2.45.2
+
