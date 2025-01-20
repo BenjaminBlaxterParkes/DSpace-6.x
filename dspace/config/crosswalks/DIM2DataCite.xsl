@@ -11,7 +11,7 @@
 -->
 <xsl:stylesheet xmlns:xsl="http://www.w3.org/1999/XSL/Transform"
                 xmlns:dspace="http://www.dspace.org/xmlns/dspace/dim"
-                xmlns="http://datacite.org/schema/kernel-3"
+                xmlns="http://datacite.org/schema/kernel-4"
                 version="2.0">
     
     <!-- CONFIGURATION -->
@@ -49,9 +49,9 @@
             properties are in the metadata of the item to export.
             The classe named above respects this.
         -->
-        <resource xmlns="http://datacite.org/schema/kernel-3"
-                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                  xsi:schemaLocation="http://datacite.org/schema/kernel-3 http://schema.datacite.org/meta/kernel-3/metadata.xsd">
+        <resource xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
+              xmlns="http://datacite.org/schema/kernel-4" 
+              xsi:schemaLocation="http://datacite.org/schema/kernel-4 https://schema.datacite.org/meta/kernel-4.4/metadata.xsd">
 
             <!--
                 MANDATORY PROPERTIES
@@ -68,8 +68,7 @@
                 company as well. We have to ensure to use URIs of our prefix
                 as primary identifiers only.
             -->
-            <xsl:apply-templates select="//dspace:field[@mdschema='dc' and @element='identifier' and starts-with(., concat($baseurl, $prefix))]" />
-
+            <xsl:apply-templates select="//dspace:field[@mdschema='dc' and @element='identifier' and starts-with(., concat('http://dx.doi.org/', $prefix))]" />
             <!--
                 DataCite (2)
                 Add creator information. 
