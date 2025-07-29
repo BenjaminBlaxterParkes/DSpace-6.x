@@ -50,6 +50,17 @@
        </field>
 
        <field>
+          <dc-schema>dc</dc-schema>
+         <dc-element>contributor</dc-element>
+         <dc-qualifier>advisor</dc-qualifier>
+         <repeatable>true</repeatable>
+         <label>Supervisors</label>
+         <input-type>name</input-type>
+         <hint>Enter the names of the supervisors of this item below.</hint>
+         <required></required>
+       </field>
+
+       <field>
          <dc-schema>dc</dc-schema>
          <dc-element>title</dc-element>
          <dc-qualifier></dc-qualifier>
